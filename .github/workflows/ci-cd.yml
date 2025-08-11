@@ -297,6 +297,31 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker run -d --name mcp-app --network mcp-network --hostname app -p 80:3000 mcp-app:$TIMESTAMP\"},\"id\":1}"
           
+          # Wait for final container to stabilize
+          echo "⏳ Waiting for final container to stabilize..."
+          sleep 15
+          
+          # Robust health check for production container
+          echo "🏥 Performing robust health check..."
+          for attempt in {1..10}; do
+            health_check=$(curl -X POST "$MCP_SERVER_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"curl -s -w 'HTTP_CODE:%{http_code}' http://localhost/health --connect-timeout 3 --max-time 10\"},\"id\":1}")
+            
+            if echo "$health_check" | grep -q "HTTP_CODE:200"; then
+              echo "✅ Production container health check passed (attempt $attempt/10)"
+              break
+            else
+              echo "⏳ Health check attempt $attempt/10 failed, retrying..."
+              sleep 3
+            fi
+            
+            if [ "$attempt" -eq 10 ]; then
+              echo "❌ Production container health check failed after 10 attempts"
+              exit 1
+            fi
+          done
+          
           # Cleanup old images (keep latest 3)
           echo "🧹 Cleaning up old Docker images..."
           curl -X POST "$MCP_SERVER_URL" \
@@ -311,7 +336,7 @@ jobs:
           
           echo "🎉 React+Vite+Nginx deployment completed successfully!"
           echo "📊 Container image: mcp-app:$TIMESTAMP"
-          echo "🌐 Application URL: $DEPLOY_URL/dashboard/"
+          echo "🌐 Application URL: $DEPLOY_URL/dashboard"
 
       - name: Deploy to Server (Demo Mode)
         if: github.ref != 'refs/heads/main'
@@ -333,19 +358,19 @@ jobs:
           
           # Test main application endpoint
           echo "🌐 Testing main application endpoint..."
-          for attempt in {1..5}; do
-            response=$(curl -s -w "HTTP_CODE:%{http_code}" "$DEPLOY_URL/dashboard/" --connect-timeout 10 --max-time 30) || {
-              echo "⏳ Connection attempt $attempt/5 failed, retrying..."
-              sleep 5
+          for attempt in {1..8}; do
+            response=$(curl -s -w "HTTP_CODE:%{http_code}" "$DEPLOY_URL/dashboard" --connect-timeout 10 --max-time 30) || {
+              echo "⏳ Connection attempt $attempt/8 failed, retrying..."
+              sleep 8
               continue
             }
             
             if echo "$response" | grep -q "HTTP_CODE:200"; then
-              echo "✅ SUCCESS: Main application accessible (attempt $attempt/5)"
+              echo "✅ SUCCESS: Main application accessible (attempt $attempt/8)"
               break
             else
-              echo "⏳ Application test attempt $attempt/5 failed, retrying..."
-              sleep 5
+              echo "⏳ Application test attempt $attempt/8 failed, retrying..."
+              sleep 8
             fi
           done
           
@@ -422,7 +447,7 @@ jobs:
           echo "- **Target:** $DEPLOY_TARGET" >> $GITHUB_STEP_SUMMARY
           echo "- **Framework:** React + Vite + React Router + Nginx" >> $GITHUB_STEP_SUMMARY
           echo "- **Containerization:** Docker + Zero-downtime deployment" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** $DEPLOY_URL/dashboard/" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** $DEPLOY_URL/dashboard" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ needs.deploy.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Post-Deploy Tests:** ${{ needs.post-deployment-tests.result == 'success' && '✅ Passed' || needs.post-deployment-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Performance:** ${{ needs.performance.result == 'success' && '✅ Passed' || '⚠️ Check Required' }}" >> $GITHUB_STEP_SUMMARY
@@ -431,9 +456,9 @@ jobs:
           if [ "${{ needs.deploy.result }}" == "success" ]; then
             echo "🎉 $DEPLOY_TYPE deployment completed successfully!"
             if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-              echo "🌐 Application is now live at: $DEPLOY_URL/dashboard/"
-              echo "🏥 Health Check: $DEPLOY_URL/dashboard/health"
-              echo "📊 System Monitor: $DEPLOY_URL/dashboard/"
+              echo "🌐 Application is now live at: $DEPLOY_URL/dashboard"
+              echo "🏥 Health Check: $DEPLOY_URL/health"
+              echo "📊 System Monitor: $DEPLOY_URL/dashboard"
             fi
           else
             echo "❌ $DEPLOY_TYPE deployment failed. Check logs for details."
