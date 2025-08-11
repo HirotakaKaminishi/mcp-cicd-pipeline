@@ -336,7 +336,7 @@ jobs:
           
           echo "🎉 React+Vite+Nginx deployment completed successfully!"
           echo "📊 Container image: mcp-app:$TIMESTAMP"
-          echo "🌐 Application URL: $DEPLOY_URL/dashboard"
+          echo "🌐 Application URL: $DEPLOY_URL/"
 
       - name: Deploy to Server (Demo Mode)
         if: github.ref != 'refs/heads/main'
@@ -363,7 +363,7 @@ jobs:
           # Test main application endpoint
           echo "🌐 Testing main application endpoint..."
           for attempt in {1..8}; do
-            response=$(curl -s -w "HTTP_CODE:%{http_code}" "$DEPLOY_URL/dashboard" --connect-timeout 10 --max-time 30) || {
+            response=$(curl -s -w "HTTP_CODE:%{http_code}" "$DEPLOY_URL/" --connect-timeout 10 --max-time 30) || {
               echo "⏳ Connection attempt $attempt/8 failed, retrying..."
               sleep 8
               continue
@@ -451,7 +451,7 @@ jobs:
           echo "- **Target:** $DEPLOY_TARGET" >> $GITHUB_STEP_SUMMARY
           echo "- **Framework:** React + Vite + React Router + Nginx" >> $GITHUB_STEP_SUMMARY
           echo "- **Containerization:** Docker + Zero-downtime deployment" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** $DEPLOY_URL/dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** $DEPLOY_URL/" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ needs.deploy.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Post-Deploy Tests:** ${{ needs.post-deployment-tests.result == 'success' && '✅ Passed' || needs.post-deployment-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Performance:** ${{ needs.performance.result == 'success' && '✅ Passed' || '⚠️ Check Required' }}" >> $GITHUB_STEP_SUMMARY
@@ -460,9 +460,9 @@ jobs:
           if [ "${{ needs.deploy.result }}" == "success" ]; then
             echo "🎉 $DEPLOY_TYPE deployment completed successfully!"
             if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-              echo "🌐 Application is now live at: $DEPLOY_URL/dashboard"
+              echo "🌐 Application is now live at: $DEPLOY_URL/"
               echo "🏥 Health Check: $DEPLOY_URL/health"
-              echo "📊 System Monitor: $DEPLOY_URL/dashboard"
+              echo "📊 Service Page: $DEPLOY_URL/service"
             fi
           else
             echo "❌ $DEPLOY_TYPE deployment failed. Check logs for details."

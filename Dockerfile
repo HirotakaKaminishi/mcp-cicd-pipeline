@@ -33,16 +33,10 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
-    location /dashboard {
+    location /service {
         root   /usr/share/nginx/html;
         index  index.html index.htm;
         try_files \$uri \$uri/ /index.html;
-    }
-
-    location /dashboard/assets/ {
-        alias  /usr/share/nginx/html/assets/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
     }
 
     location /assets/ {
