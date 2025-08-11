@@ -21,16 +21,21 @@ FROM nginx:alpine
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration if needed
+# Configure nginx with proper settings
 RUN cat > /etc/nginx/conf.d/default.conf <<EOF
 server {
-    listen       80;
+    listen       3000;
     server_name  localhost;
 
     location / {
         root   /usr/share/nginx/html;
         index  index.html index.htm;
         try_files \$uri \$uri/ /index.html;
+    }
+
+    location /health {
+        return 200 "OK";
+        add_header Content-Type text/plain;
     }
 
     # API proxy (if backend is available)
@@ -50,6 +55,6 @@ server {
 }
 EOF
 
-EXPOSE 80
+EXPOSE 3000
 
 CMD ["nginx", "-g", "daemon off;"]
