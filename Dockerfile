@@ -33,6 +33,18 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
+    location /dashboard {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    location /health {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+        try_files \$uri \$uri/ /index.html;
+    }
+
     location /service {
         root   /usr/share/nginx/html;
         index  index.html index.htm;
@@ -45,9 +57,10 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
-    location /health {
-        return 200 "OK";
-        add_header Content-Type text/plain;
+    location /api/health {
+        proxy_pass http://mcp-api:3000/api/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
     }
 
     # API proxy to mcp-api container
