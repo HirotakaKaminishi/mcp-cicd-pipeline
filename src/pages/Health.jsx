@@ -91,7 +91,7 @@ function Health() {
           <h3>Metrics</h3>
           <div className="metric-item">
             <span className="metric-label">Uptime:</span>
-            <span className="metric-value">{healthData.metrics.uptime}%</span>
+            <span className="metric-value">{healthData.metrics.uptime}</span>
           </div>
           <div className="metric-item">
             <span className="metric-label">Requests/min:</span>

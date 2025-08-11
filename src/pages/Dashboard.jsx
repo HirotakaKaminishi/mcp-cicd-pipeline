@@ -45,19 +45,38 @@ function Dashboard() {
         const histResponse = await fetch('/api/resources/history');
         const histData = await histResponse.json();
         
+        // Fetch current resource data for app stats
+        const resourceResponse = await fetch('/api/resources');
+        const resourceData = await resourceResponse.json();
+        
+        // Fetch server system stats
+        const serverResponse = await fetch('/api/server-stats');
+        const serverData = await serverResponse.json();
+        
+        // Fetch container information
+        const containerResponse = await fetch('/api/containers');
+        const containerData = await containerResponse.json();
+        
         setSystemData({
           app: {
-            cpu: sysData.app?.cpu?.usage_percent || 0,
-            memory: sysData.app?.memory?.heap_usage_percent || 0
+            cpu: resourceData.cpu?.usage_percent || 0,
+            memory: resourceData.memory?.heap_usage_percent || 0
           },
           server: {
-            cpu: sysData.system?.cpu?.usage || 0,
-            memory: sysData.system?.memory?.used_percent || 0
+            cpu: serverData.system?.cpu?.usage_percent || 0,
+            memory: serverData.system?.memory?.usage_percent || 0
           },
-          containers: sysData.containers || []
+          containers: containerData.containers || []
         });
         
-        setResourceHistory(histData.data || []);
+        // Combine app history with current server stats to create enhanced history
+        const enhancedHistory = (histData.data || []).map(point => ({
+          ...point,
+          server_cpu_percent: serverData.system?.cpu?.usage_percent || 0,
+          server_memory_percent: serverData.system?.memory?.usage_percent || 0
+        }));
+        
+        setResourceHistory(enhancedHistory);
       } catch (error) {
         console.error('Failed to fetch data:', error);
       }
@@ -93,17 +112,31 @@ function Dashboard() {
     labels: resourceHistory.map(d => new Date(d.timestamp)),
     datasets: [
       {
-        label: 'CPU %',
-        data: resourceHistory.map(d => d.cpu.usage_percent),
+        label: 'App CPU %',
+        data: resourceHistory.map(d => d.cpu_percent || d.cpu?.usage_percent || 0),
         borderColor: '#00e396',
         backgroundColor: 'rgba(0, 227, 150, 0.1)',
         tension: 0.4
       },
       {
-        label: 'Memory %',
-        data: resourceHistory.map(d => d.memory.heap_usage_percent),
+        label: 'App Memory %',
+        data: resourceHistory.map(d => d.memory_percent || d.memory?.heap_usage_percent || 0),
         borderColor: '#feb019',
         backgroundColor: 'rgba(254, 176, 25, 0.1)',
+        tension: 0.4
+      },
+      {
+        label: 'Server CPU %',
+        data: resourceHistory.map(d => d.server_cpu_percent || 0),
+        borderColor: '#008ffb',
+        backgroundColor: 'rgba(0, 143, 251, 0.1)',
+        tension: 0.4
+      },
+      {
+        label: 'Server Memory %',
+        data: resourceHistory.map(d => d.server_memory_percent || 0),
+        borderColor: '#775dd0',
+        backgroundColor: 'rgba(119, 93, 208, 0.1)',
         tension: 0.4
       }
     ]

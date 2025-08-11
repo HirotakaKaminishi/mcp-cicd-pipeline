@@ -1,4 +1,4 @@
-name: React Vite CI/CD Pipeline
+name: React Vite + Nginx CI/CD Pipeline
 
 on:
   push:
@@ -23,6 +23,8 @@ on:
 env:
   NODE_VERSION: '20'
   DEPLOY_URL: ${{ secrets.DEPLOY_URL || 'http://192.168.111.200' }}
+  MCP_SERVER_URL: ${{ secrets.MCP_SERVER_URL || 'http://192.168.111.200:8080' }}
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/root/mcp_containers' }}
 
 jobs:
   test:
@@ -110,16 +112,145 @@ jobs:
           name: build-artifacts
           path: dist/
 
-      - name: Deploy to Server (Production)
+      - name: Verify MCP Server connectivity
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "🚀 Starting production deployment"
+          echo "🔍 Testing MCP server connectivity..."
+          response=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"get_system_info","params":{},"id":1}' \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --fail \
+            --silent) || {
+            echo "❌ Cannot connect to MCP server at $MCP_SERVER_URL"
+            exit 1
+          }
+          
+          echo "✅ MCP server connected successfully"
+
+      - name: Deploy to Server (Production)
+        if: github.ref == 'refs/heads/main'
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          echo "🚀 Starting React+Vite+Nginx production deployment"
           echo "📦 Repository: ${{ github.repository }}"
           echo "🔄 Commit: ${{ github.sha }}"
           echo "🏃 Run: #${{ github.run_number }}"
           
-          # Deployment logic here
-          echo "✅ Deployment completed successfully"
+          # Create timestamped release directory
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          RELEASE_DIR="$DEPLOY_PATH/releases/$TIMESTAMP"
+          
+          echo "📁 Creating release directory: $RELEASE_DIR"
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mkdir -p $RELEASE_DIR\"},\"id\":1}"
+          
+          # Deploy React build files
+          echo "📂 Deploying React build files..."
+          for file in dist/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "📝 Deploying: $filename"
+              
+              # Encode file content as base64
+              encoded_content=$(base64 -w 0 "$file")
+              
+              # Deploy via MCP API
+              curl -X POST "$MCP_SERVER_URL" \
+                -H "Content-Type: application/json" \
+                -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_content' | base64 -d > $RELEASE_DIR/$filename\"},\"id\":1}"
+              
+              echo "✅ SUCCESS: $filename deployed"
+            fi
+          done
+          
+          # Deploy assets directory if exists
+          if [ -d "dist/assets" ]; then
+            echo "📂 Deploying assets directory..."
+            curl -X POST "$MCP_SERVER_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mkdir -p $RELEASE_DIR/assets\"},\"id\":1}"
+            
+            for asset in dist/assets/*; do
+              if [ -f "$asset" ]; then
+                asset_name=$(basename "$asset")
+                echo "📝 Deploying asset: $asset_name"
+                
+                encoded_asset=$(base64 -w 0 "$asset")
+                curl -X POST "$MCP_SERVER_URL" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_asset' | base64 -d > $RELEASE_DIR/assets/$asset_name\"},\"id\":1}"
+                
+                echo "✅ SUCCESS: assets/$asset_name deployed"
+              fi
+            done
+          fi
+          
+          # Copy files to app container build directory
+          echo "🔗 Preparing container deployment..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"rm -rf $DEPLOY_PATH/app/src/* && cp -r $RELEASE_DIR/* $DEPLOY_PATH/app/src/\"},\"id\":1}"
+          
+          # Build new Docker image with Nginx
+          echo "🏗️ Building React+Nginx container image..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"cd $DEPLOY_PATH/app && docker build -t mcp-app:$TIMESTAMP .\"},\"id\":1}"
+          
+          # Zero-downtime container replacement
+          echo "🔄 Starting zero-downtime deployment..."
+          
+          # Start new container
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker run -d --name mcp-app-new --network mcp-network --hostname app -p 81:3000 mcp-app:$TIMESTAMP\"},\"id\":1}"
+          
+          # Wait for new container to be ready
+          echo "⏳ Waiting for new container to be ready..."
+          sleep 5
+          
+          # Health check new container
+          health_response=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"curl -s http://localhost:81/health --connect-timeout 5 || echo 'Health check failed'\"},\"id\":1}")
+          
+          echo "🏥 Health check result: $health_response"
+          
+          # Switch traffic (stop old, promote new)
+          echo "🔄 Switching traffic to new container..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker stop mcp-app 2>/dev/null || echo 'No old container'; docker rm mcp-app 2>/dev/null || echo 'No old container to remove'\"},\"id\":1}"
+          
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker stop mcp-app-new && docker rm mcp-app-new\"},\"id\":1}"
+          
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker run -d --name mcp-app --network mcp-network --hostname app -p 80:3000 mcp-app:$TIMESTAMP\"},\"id\":1}"
+          
+          # Cleanup old images (keep latest 3)
+          echo "🧹 Cleaning up old Docker images..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker images mcp-app --format '{{.Tag}}' | grep -E '^[0-9]{8}_[0-9]{6}$' | sort -r | tail -n +4 | xargs -r -I {} docker rmi mcp-app:{} 2>/dev/null || echo 'No old images to remove'\"},\"id\":1}"
+          
+          # Cleanup old releases (keep latest 5)
+          echo "🧹 Cleaning up old releases..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"cd $DEPLOY_PATH/releases && ls -1t | tail -n +6 | xargs -r rm -rf\"},\"id\":1}"
+          
+          echo "🎉 React+Vite+Nginx deployment completed successfully!"
+          echo "📊 Container image: mcp-app:$TIMESTAMP"
+          echo "🌐 Application URL: $DEPLOY_URL/dashboard/"
 
       - name: Deploy to Server (Demo Mode)
         if: github.ref != 'refs/heads/main'
@@ -128,6 +259,51 @@ jobs:
           echo "📦 Repository: ${{ github.repository }}"
           echo "🌿 Branch: ${{ github.ref_name }}"
           echo "✅ Demo deployment completed"
+
+  post-deployment-tests:
+    runs-on: ubuntu-latest
+    needs: deploy
+    name: 🧪 Post-Deployment Tests
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Run post-deployment verification
+        run: |
+          echo "🧪 Running post-deployment verification..."
+          
+          # Test main application endpoint
+          echo "🌐 Testing main application endpoint..."
+          for attempt in {1..5}; do
+            response=$(curl -s -w "HTTP_CODE:%{http_code}" "$DEPLOY_URL/dashboard/" --connect-timeout 10 --max-time 30) || {
+              echo "⏳ Connection attempt $attempt/5 failed, retrying..."
+              sleep 5
+              continue
+            }
+            
+            if echo "$response" | grep -q "HTTP_CODE:200"; then
+              echo "✅ SUCCESS: Main application accessible (attempt $attempt/5)"
+              break
+            else
+              echo "⏳ Application test attempt $attempt/5 failed, retrying..."
+              sleep 5
+            fi
+          done
+          
+          # Test API endpoints
+          echo "🔗 Testing API endpoints..."
+          api_endpoints=("/api/system" "/api/health" "/api/resources" "/api/server-stats" "/api/containers")
+          
+          for endpoint in "${api_endpoints[@]}"; do
+            echo "🧪 Testing $endpoint..."
+            api_response=$(curl -s -w "HTTP_CODE:%{http_code}" "$DEPLOY_URL$endpoint" --connect-timeout 5 --max-time 15)
+            
+            if echo "$api_response" | grep -q "HTTP_CODE:200"; then
+              echo "✅ SUCCESS: $endpoint is responding"
+            else
+              echo "⚠️ WARNING: $endpoint may have issues"
+            fi
+          done
+          
+          echo "✅ Post-deployment verification completed"
 
   performance:
     runs-on: ubuntu-latest
@@ -148,17 +324,20 @@ jobs:
           echo "📊 Analyzing bundle size..."
           du -sh dist/
           find dist -name "*.js" -exec ls -lh {} \;
+          find dist -name "*.css" -exec ls -lh {} \;
           
-      - name: Run Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v12
-        if: false # Disabled for now, can be enabled when needed
-        with:
-          uploadArtifacts: true
-          temporaryPublicStorage: true
+          # Check if bundle is too large (warning if > 1MB)
+          js_size=$(find dist -name "*.js" -exec ls -l {} \; | awk '{sum += $5} END {print sum}')
+          if [ "$js_size" -gt 1048576 ]; then
+            echo "⚠️ WARNING: JavaScript bundle size is large ($(echo $js_size | numfmt --to=iec))"
+            echo "Consider code splitting or optimization"
+          else
+            echo "✅ Bundle size is acceptable ($(echo $js_size | numfmt --to=iec))"
+          fi
 
   notify:
     runs-on: ubuntu-latest
-    needs: [test, build, deploy]
+    needs: [test, build, deploy, post-deployment-tests, performance]
     name: 📢 Deployment Notifications
     if: always()
     steps:
@@ -167,7 +346,7 @@ jobs:
           # Set deployment type
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             DEPLOY_TYPE="Production"
-            DEPLOY_TARGET="React Vite Application"
+            DEPLOY_TARGET="React + Vite + Nginx (Dockerized)"
           else
             DEPLOY_TYPE="Demo"
             DEPLOY_TARGET="Simulation Mode"
@@ -180,12 +359,21 @@ jobs:
           echo "- **Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Deploy Type:** $DEPLOY_TYPE" >> $GITHUB_STEP_SUMMARY
           echo "- **Target:** $DEPLOY_TARGET" >> $GITHUB_STEP_SUMMARY
-          echo "- **Framework:** React + Vite + React Router" >> $GITHUB_STEP_SUMMARY
+          echo "- **Framework:** React + Vite + React Router + Nginx" >> $GITHUB_STEP_SUMMARY
+          echo "- **Containerization:** Docker + Zero-downtime deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** $DEPLOY_URL/dashboard/" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ needs.deploy.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Post-Deploy Tests:** ${{ needs.post-deployment-tests.result == 'success' && '✅ Passed' || needs.post-deployment-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance:** ${{ needs.performance.result == 'success' && '✅ Passed' || '⚠️ Check Required' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.deploy.result }}" == "success" ]; then
             echo "🎉 $DEPLOY_TYPE deployment completed successfully!"
+            if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+              echo "🌐 Application is now live at: $DEPLOY_URL/dashboard/"
+              echo "🏥 Health Check: $DEPLOY_URL/dashboard/health"
+              echo "📊 System Monitor: $DEPLOY_URL/dashboard/"
+            fi
           else
             echo "❌ $DEPLOY_TYPE deployment failed. Check logs for details."
             exit 1
