@@ -347,7 +347,7 @@ jobs:
           echo "✅ Demo deployment completed"
 
   post-deployment-tests:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: deploy
     name: 🧪 Post-Deployment Tests
     if: github.ref == 'refs/heads/main'
@@ -355,6 +355,10 @@ jobs:
       - name: Run post-deployment verification
         run: |
           echo "🧪 Running post-deployment verification..."
+          
+          # Wait for deployment to fully stabilize
+          echo "⏳ Waiting for deployment to stabilize..."
+          sleep 10
           
           # Test main application endpoint
           echo "🌐 Testing main application endpoint..."
