@@ -150,20 +150,51 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mkdir -p $RELEASE_DIR\"},\"id\":1}"
           
-          # Deploy React build files
+          # Deploy React build files using chunked approach for large files
           echo "📂 Deploying React build files..."
           for file in dist/*; do
             if [ -f "$file" ]; then
               filename=$(basename "$file")
               echo "📝 Deploying: $filename"
               
-              # Encode file content as base64
-              encoded_content=$(base64 -w 0 "$file")
+              # Check file size
+              file_size=$(wc -c < "$file")
+              echo "🔍 File size: $file_size bytes"
               
-              # Deploy via MCP API
-              curl -X POST "$MCP_SERVER_URL" \
-                -H "Content-Type: application/json" \
-                -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_content' | base64 -d > $RELEASE_DIR/$filename\"},\"id\":1}"
+              if [ "$file_size" -gt 50000 ]; then
+                # Large file: use temporary file approach
+                echo "⚠️ Large file detected, using alternative method..."
+                
+                # Create temporary file on server
+                temp_filename="/tmp/deploy_$(date +%s)_$filename"
+                curl -X POST "$MCP_SERVER_URL" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"touch $temp_filename\"},\"id\":1}"
+                
+                # Split file and send in chunks
+                split -b 40000 "$file" "/tmp/chunk_"
+                for chunk in /tmp/chunk_*; do
+                  if [ -f "$chunk" ]; then
+                    encoded_chunk=$(base64 -w 0 "$chunk")
+                    curl -X POST "$MCP_SERVER_URL" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_chunk' | base64 -d >> $temp_filename\"},\"id\":1}"
+                    rm "$chunk"
+                  fi
+                done
+                
+                # Move to final location
+                curl -X POST "$MCP_SERVER_URL" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mv $temp_filename $RELEASE_DIR/$filename\"},\"id\":1}"
+                
+              else
+                # Small file: use original method
+                encoded_content=$(base64 -w 0 "$file")
+                curl -X POST "$MCP_SERVER_URL" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_content' | base64 -d > $RELEASE_DIR/$filename\"},\"id\":1}"
+              fi
               
               echo "✅ SUCCESS: $filename deployed"
             fi
@@ -181,10 +212,40 @@ jobs:
                 asset_name=$(basename "$asset")
                 echo "📝 Deploying asset: $asset_name"
                 
-                encoded_asset=$(base64 -w 0 "$asset")
-                curl -X POST "$MCP_SERVER_URL" \
-                  -H "Content-Type: application/json" \
-                  -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_asset' | base64 -d > $RELEASE_DIR/assets/$asset_name\"},\"id\":1}"
+                # Check asset file size
+                asset_size=$(wc -c < "$asset")
+                echo "🔍 Asset size: $asset_size bytes"
+                
+                if [ "$asset_size" -gt 50000 ]; then
+                  # Large asset: use chunked approach
+                  echo "⚠️ Large asset detected, using chunked method..."
+                  temp_asset="/tmp/deploy_asset_$(date +%s)_$asset_name"
+                  
+                  curl -X POST "$MCP_SERVER_URL" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"touch $temp_asset\"},\"id\":1}"
+                  
+                  split -b 40000 "$asset" "/tmp/asset_chunk_"
+                  for chunk in /tmp/asset_chunk_*; do
+                    if [ -f "$chunk" ]; then
+                      encoded_chunk=$(base64 -w 0 "$chunk")
+                      curl -X POST "$MCP_SERVER_URL" \
+                        -H "Content-Type: application/json" \
+                        -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_chunk' | base64 -d >> $temp_asset\"},\"id\":1}"
+                      rm "$chunk"
+                    fi
+                  done
+                  
+                  curl -X POST "$MCP_SERVER_URL" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mv $temp_asset $RELEASE_DIR/assets/$asset_name\"},\"id\":1}"
+                else
+                  # Small asset: use original method
+                  encoded_asset=$(base64 -w 0 "$asset")
+                  curl -X POST "$MCP_SERVER_URL" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_asset' | base64 -d > $RELEASE_DIR/assets/$asset_name\"},\"id\":1}"
+                fi
                 
                 echo "✅ SUCCESS: assets/$asset_name deployed"
               fi
