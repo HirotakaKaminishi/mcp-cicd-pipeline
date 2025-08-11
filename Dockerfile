@@ -21,7 +21,7 @@ FROM nginx:alpine
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Configure nginx with proper settings
+# Configure nginx with proper routing and asset serving
 RUN cat > /etc/nginx/conf.d/default.conf <<EOF
 server {
     listen       3000;
@@ -31,6 +31,24 @@ server {
         root   /usr/share/nginx/html;
         index  index.html index.htm;
         try_files \$uri \$uri/ /index.html;
+    }
+
+    location /dashboard {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    location /dashboard/assets/ {
+        alias  /usr/share/nginx/html/assets/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /assets/ {
+        alias  /usr/share/nginx/html/assets/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
 
     location /health {
