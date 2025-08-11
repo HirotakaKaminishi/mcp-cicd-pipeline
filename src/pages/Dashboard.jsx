@@ -37,9 +37,6 @@ function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch system data
-        const sysResponse = await fetch('/api/system');
-        const sysData = await sysResponse.json();
         
         // Fetch resource history
         const histResponse = await fetch('/api/resources/history');
