@@ -1,6 +1,7 @@
 /* Service Landing Page Styles */
 .service-landing {
-  min-height: 100vh;
+  min-height: calc(100vh - 80px); /* Account for App.jsx navigation */
+  margin-top: 0; /* Let App.jsx navigation show */
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   position: relative;
   overflow-x: hidden;
@@ -8,7 +9,7 @@
 
 .animated-bg {
   position: fixed;
-  top: 0;
+  top: 80px; /* Start below App.jsx navigation */
   left: 0;
   right: 0;
   bottom: 0;
