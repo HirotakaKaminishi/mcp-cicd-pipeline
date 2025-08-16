@@ -32,39 +32,6 @@ function ServiceLanding() {
         <div className="gradient-orb orb-3"></div>
       </div>
 
-      {/* Internal page navigation */}
-      <div className="page-nav" style={{ 
-        position: 'fixed', 
-        top: '80px', 
-        right: '20px', 
-        zIndex: 1000, 
-        background: 'rgba(255,255,255,0.1)', 
-        backdropFilter: 'blur(10px)', 
-        borderRadius: '10px', 
-        padding: '10px' 
-      }}>
-        <a href="#features" className="nav-link" style={{ 
-          display: 'block', 
-          color: '#fff', 
-          textDecoration: 'none', 
-          padding: '5px 10px', 
-          fontSize: '14px' 
-        }}>Features</a>
-        <a href="#stats" className="nav-link" style={{ 
-          display: 'block', 
-          color: '#fff', 
-          textDecoration: 'none', 
-          padding: '5px 10px', 
-          fontSize: '14px' 
-        }}>Statistics</a>
-        <a href="#contact" className="nav-link" style={{ 
-          display: 'block', 
-          color: '#fff', 
-          textDecoration: 'none', 
-          padding: '5px 10px', 
-          fontSize: '14px' 
-        }}>Contact</a>
-      </div>
 
       <section className="hero-section">
         <div className="hero-content">

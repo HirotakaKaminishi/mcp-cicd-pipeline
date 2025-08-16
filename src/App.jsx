@@ -14,7 +14,7 @@ function App() {
             <span className="brand-name">Monitoring Platform</span>
           </div>
           <div className="nav-links">
-            <Link to="/" className="nav-item">Dashboard</Link>
+            <Link to="/dashboard" className="nav-item">Dashboard</Link>
             <Link to="/health" className="nav-item">Health Check</Link>
             <Link to="/service" className="nav-item">Service</Link>
           </div>
@@ -23,6 +23,7 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/health" element={<Health />} />
             <Route path="/service" element={<ServiceLanding />} />
           </Routes>
