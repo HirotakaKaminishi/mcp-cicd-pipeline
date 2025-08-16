@@ -5,11 +5,14 @@ function ServiceLanding() {
   useEffect(() => {
     // Smooth scroll for navigation
     const handleScroll = (e) => {
-      e.preventDefault();
-      const targetId = e.target.getAttribute('href').substring(1);
-      const targetElement = document.getElementById(targetId);
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth' });
+      // Only handle internal page anchors, not React Router links
+      if (e.target.getAttribute('href') && e.target.getAttribute('href').startsWith('#')) {
+        e.preventDefault();
+        const targetId = e.target.getAttribute('href').substring(1);
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth' });
+        }
       }
     };
 
@@ -29,20 +32,39 @@ function ServiceLanding() {
         <div className="gradient-orb orb-3"></div>
       </div>
 
-      <nav className="nav-modern">
-        <div className="nav-container">
-          <div className="nav-brand">
-            <div className="brand-icon">CI</div>
-            <span className="brand-text">NextGen Platform</span>
-          </div>
-          <div className="nav-menu">
-            <a href="#features" className="nav-link">Features</a>
-            <a href="#stats" className="nav-link">Statistics</a>
-            <a href="#testimonials" className="nav-link">Reviews</a>
-            <a href="#contact" className="nav-link nav-cta">Get Started</a>
-          </div>
-        </div>
-      </nav>
+      {/* Internal page navigation */}
+      <div className="page-nav" style={{ 
+        position: 'fixed', 
+        top: '80px', 
+        right: '20px', 
+        zIndex: 1000, 
+        background: 'rgba(255,255,255,0.1)', 
+        backdropFilter: 'blur(10px)', 
+        borderRadius: '10px', 
+        padding: '10px' 
+      }}>
+        <a href="#features" className="nav-link" style={{ 
+          display: 'block', 
+          color: '#fff', 
+          textDecoration: 'none', 
+          padding: '5px 10px', 
+          fontSize: '14px' 
+        }}>Features</a>
+        <a href="#stats" className="nav-link" style={{ 
+          display: 'block', 
+          color: '#fff', 
+          textDecoration: 'none', 
+          padding: '5px 10px', 
+          fontSize: '14px' 
+        }}>Statistics</a>
+        <a href="#contact" className="nav-link" style={{ 
+          display: 'block', 
+          color: '#fff', 
+          textDecoration: 'none', 
+          padding: '5px 10px', 
+          fontSize: '14px' 
+        }}>Contact</a>
+      </div>
 
       <section className="hero-section">
         <div className="hero-content">
