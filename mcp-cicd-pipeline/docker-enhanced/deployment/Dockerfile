@@ -16,7 +16,7 @@ WORKDIR /app
 
 # Copy deployment tools
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Copy deployment scripts
 COPY . .
@@ -28,7 +28,7 @@ RUN pip3 install requests
 RUN chmod +x /app/*.js /app/*.sh
 
 # Create deployment directories
-RUN mkdir -p /var/deployment /var/log/deployment
+RUN mkdir -p /var/deployment /var/log/deployment /deployment_tools
 
 # Create non-root user
 RUN addgroup -g 1001 -S deployment

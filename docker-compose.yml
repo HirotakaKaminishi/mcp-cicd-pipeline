@@ -69,7 +69,7 @@ services:
       dockerfile: Dockerfile
     container_name: deployment-manager
     volumes:
-      - ./02_deployment_tools:/app
+      - ./02_deployment_tools:/deployment_tools
       - ./deployment:/var/deployment
       - /var/run/docker.sock:/var/run/docker.sock
     networks:

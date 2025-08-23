@@ -6,7 +6,7 @@ RUN apk add --no-cache curl
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files from root context
 COPY package*.json ./
 
 # Install ALL dependencies
