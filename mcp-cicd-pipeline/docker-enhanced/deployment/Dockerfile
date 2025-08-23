@@ -21,8 +21,8 @@ RUN npm install
 # Copy deployment scripts
 COPY . .
 
-# Install Python packages for MCP communication
-RUN pip3 install requests
+# Install Python packages for MCP communication (bypass externally-managed-environment)
+RUN pip3 install --break-system-packages requests
 
 # Make scripts executable
 RUN chmod +x /app/*.js /app/*.sh
