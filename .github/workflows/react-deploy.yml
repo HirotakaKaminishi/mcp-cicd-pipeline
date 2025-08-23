@@ -1,0 +1,138 @@
+name: React CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  MCP_SERVER_URL: http://192.168.111.200:8080
+  DEPLOY_PATH: /var/deployment/react-app
+  NODE_VERSION: '20'
+
+jobs:
+  test:
+    name: Test React Application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'mcp-cicd-pipeline/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./mcp-cicd-pipeline
+        run: npm ci
+
+      - name: Run linter
+        working-directory: ./mcp-cicd-pipeline
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: ./mcp-cicd-pipeline
+        run: npm test -- --run
+
+  build:
+    name: Build React Application
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'mcp-cicd-pipeline/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./mcp-cicd-pipeline
+        run: npm ci
+
+      - name: Build application
+        working-directory: ./mcp-cicd-pipeline
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-build
+          path: mcp-cicd-pipeline/dist/
+
+  deploy:
+    name: Deploy to MCP Server
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: react-build
+          path: ./dist
+
+      - name: Deploy via MCP API
+        run: |
+          echo "Deploying to MCP Server..."
+          
+          # Create deployment directory
+          curl -X POST "${{ env.MCP_SERVER_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "jsonrpc": "2.0",
+              "method": "execute_command",
+              "params": {
+                "command": "mkdir -p ${{ env.DEPLOY_PATH }}"
+              },
+              "id": 1
+            }'
+          
+          # Deploy build files
+          tar czf - dist/ | base64 | curl -X POST "${{ env.MCP_SERVER_URL }}" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "jsonrpc": "2.0",
+            "method": "write_file",
+            "params": {
+              "path": "${{ env.DEPLOY_PATH }}/app.tar.gz.b64",
+              "content": "$(cat)"
+            },
+            "id": 2
+          }
+          EOF
+          
+          # Extract and deploy
+          curl -X POST "${{ env.MCP_SERVER_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "jsonrpc": "2.0",
+              "method": "execute_command",
+              "params": {
+                "command": "cd ${{ env.DEPLOY_PATH }} && base64 -d app.tar.gz.b64 | tar xzf - && rm app.tar.gz.b64"
+              },
+              "id": 3
+            }'
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.111.200/)
+          if [ $response -eq 200 ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment verification failed"
+            exit 1
+          fi
