@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mcp-server:
     build:
-      context: ./mcp-cicd-pipeline/docker-enhanced/mcp-server
+      context: ./docker-enhanced/mcp-server
       dockerfile: Dockerfile
     container_name: mcp-server
     ports:
@@ -25,7 +25,7 @@ services:
 
   nginx:
     build:
-      context: ./mcp-cicd-pipeline/docker-enhanced/nginx
+      context: ./docker-enhanced/nginx
       dockerfile: Dockerfile
     container_name: nginx-proxy
     ports:
@@ -48,14 +48,11 @@ services:
 
   react-app:
     build:
-      context: ./mcp-cicd-pipeline
+      context: .
       dockerfile: ./docker-enhanced/react-app/Dockerfile
     container_name: react-app
     ports:
       - "3000:3000"
-    volumes:
-      - ./mcp-cicd-pipeline:/app
-      - node_modules:/app/node_modules
     networks:
       - mcp-network
     restart: always
@@ -64,14 +61,19 @@ services:
       - VITE_MCP_SERVER_URL=http://mcp-server:8080
     depends_on:
       - mcp-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   deployment-manager:
     build:
-      context: ./mcp-cicd-pipeline/docker-enhanced/deployment
+      context: ./docker-enhanced/deployment
       dockerfile: Dockerfile
     container_name: deployment-manager
     volumes:
-      - ./02_deployment_tools:/app
+      - ./scripts:/app/scripts
       - ./deployment:/var/deployment
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -81,6 +83,11 @@ services:
       - mcp-server
     environment:
       - MCP_SERVER_URL=http://mcp-server:8080
+    healthcheck:
+      test: ["CMD", "ps", "aux"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   mcp-network:
@@ -91,7 +98,7 @@ networks:
           gateway: 172.20.0.1
 
 volumes:
-  node_modules:
+  react_app_node_modules:
     driver: local
   nginx_logs:
     driver: local

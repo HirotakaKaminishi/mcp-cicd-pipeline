@@ -1,0 +1,320 @@
+name: MCP Server + React App CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: '20'
+  DEPLOY_SERVER: '192.168.111.200'
+  DEPLOY_USER: 'root'
+  DEPLOY_PATH: '/root/mcp_containers'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: 🧪 Test Application
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test -- --run
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-build
+          path: dist/
+          retention-days: 7
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    name: 🚀 Deploy with Docker Compose
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: react-build
+          path: dist/
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOY_SERVER }} >> ~/.ssh/known_hosts
+
+      - name: Create deployment package
+        run: |
+          # Create deployment archive
+          tar -czf deployment.tar.gz \
+            docker-compose.yml \
+            nginx.conf \
+            Dockerfile \
+            mcp-server/ \
+            dist/
+
+      - name: Deploy to server
+        run: |
+          echo "🚀 Starting deployment to ${{ env.DEPLOY_SERVER }}"
+          
+          # Upload deployment package
+          scp deployment.tar.gz ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_SERVER }}:${{ env.DEPLOY_PATH }}/
+          
+          # Execute deployment on remote server
+          ssh ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_SERVER }} << 'EOF'
+            cd ${{ env.DEPLOY_PATH }}
+            
+            echo "📦 Extracting deployment package..."
+            tar -xzf deployment.tar.gz
+            rm deployment.tar.gz
+            
+            echo "🧹 Cleaning up old containers and resources..."
+            # Stop and remove old containers
+            docker stop mcp-app mcp-api 2>/dev/null || echo "Old containers already stopped"
+            docker rm mcp-app mcp-api 2>/dev/null || echo "Old containers already removed"
+            
+            # Stop existing services
+            docker compose down --remove-orphans || echo "No existing services to stop"
+            
+            echo "🔧 Building and deploying with Docker Compose..."
+            # Build and start services
+            docker compose up -d --build --force-recreate
+            
+            echo "⏳ Waiting for services to start..."
+            sleep 45
+            
+            # Health check
+            echo "🏥 Performing health checks..."
+            
+            # Check MCP Server (new port)
+            if curl -f http://localhost:8081/health --connect-timeout 15; then
+              echo "✅ MCP Server is healthy"
+            else
+              echo "❌ MCP Server health check failed"
+              exit 1
+            fi
+            
+            # Check React App (new port)
+            if curl -f http://localhost:8090/nginx-health --connect-timeout 15; then
+              echo "✅ React App is healthy"
+            else
+              echo "❌ React App health check failed"
+              exit 1
+            fi
+            
+            # Check containers
+            echo "📊 Container status:"
+            docker compose ps
+            
+            # Comprehensive cleanup
+            echo "🧹 Performing comprehensive cleanup..."
+            # Remove unused images (keep last 24 hours)
+            docker image prune -a --filter "until=24h" -f
+            # Remove unused containers
+            docker container prune -f
+            # Remove unused networks (except current ones)
+            docker network prune -f
+            # Remove unused volumes (be careful with data)
+            docker volume prune -f || echo "Volume cleanup skipped for safety"
+            # Remove build cache older than 7 days
+            docker builder prune --keep-storage=1GB --filter="until=168h" -f
+            
+            echo "🎉 Deployment completed successfully!"
+            
+            # Deploy MCP configuration files
+            echo "⚙️ Deploying MCP configuration..."
+            mkdir -p /root/mcp-config
+            cat > /root/mcp-config/.mcp.json << 'MCP_EOF'
+{
+  "servers": {
+    "remote-extended": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "@anthropic-ai/mcp-client-stdio", 
+        "http://192.168.111.200:8080"
+      ],
+      "env": {
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    },
+    "remote-new": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "@anthropic-ai/mcp-client-stdio", 
+        "http://192.168.111.200:8081"
+      ],
+      "env": {
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+  }
+}
+MCP_EOF
+            echo "✅ MCP configuration deployed to /root/mcp-config/.mcp.json"
+          EOF
+
+      - name: Verify deployment
+        run: |
+          echo "🧪 Verifying deployment..."
+          
+          # Test main application (new port)
+          if curl -f http://${{ env.DEPLOY_SERVER }}:8090/ --connect-timeout 15; then
+            echo "✅ React application is accessible on port 8090"
+          else
+            echo "❌ React application is not accessible on port 8090"
+            exit 1
+          fi
+          
+          # Test MCP API (new port)
+          if curl -f http://${{ env.DEPLOY_SERVER }}:8081/health --connect-timeout 15; then
+            echo "✅ MCP Server API is accessible on port 8081"
+          else
+            echo "❌ MCP Server API is not accessible on port 8081"
+            exit 1
+          fi
+          
+          # Test API proxy through React app
+          if curl -f http://${{ env.DEPLOY_SERVER }}:8090/health --connect-timeout 15; then
+            echo "✅ API proxy is working"
+          else
+            echo "❌ API proxy is not working"
+            exit 1
+          fi
+          
+          # Test original MCP server (should still work)
+          if curl -f http://${{ env.DEPLOY_SERVER }}:8080/ --connect-timeout 10; then
+            echo "✅ Original MCP server still accessible"
+          else
+            echo "⚠️ Original MCP server not accessible (expected if replaced)"
+          fi
+
+  test-mcp-tools:
+    runs-on: ubuntu-latest
+    needs: deploy
+    name: 🔧 Test MCP Tools
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Test File Operations
+        run: |
+          echo "📁 Testing file operations..."
+          
+          # Test file write
+          response=$(curl -X POST http://${{ env.DEPLOY_SERVER }}:8081/api/file/write \
+            -H "Content-Type: application/json" \
+            -d '{"path":"/root/mcp_project/test.txt","content":"Hello from CI/CD test"}' \
+            --connect-timeout 15)
+          echo "Write response: $response"
+          
+          # Test file read
+          response=$(curl -X POST http://${{ env.DEPLOY_SERVER }}:8081/api/file/read \
+            -H "Content-Type: application/json" \
+            -d '{"path":"/root/mcp_project/test.txt"}' \
+            --connect-timeout 15)
+          echo "Read response: $response"
+          
+          # Test directory listing
+          response=$(curl -X POST http://${{ env.DEPLOY_SERVER }}:8081/api/file/list \
+            -H "Content-Type: application/json" \
+            -d '{"path":"/root/mcp_project"}' \
+            --connect-timeout 15)
+          echo "List response: $response"
+
+      - name: Test System Operations
+        run: |
+          echo "💻 Testing system operations..."
+          
+          # Test system info
+          response=$(curl -X GET http://${{ env.DEPLOY_SERVER }}:8081/api/system/info \
+            --connect-timeout 15)
+          echo "System info response: $response"
+          
+          # Test command execution
+          response=$(curl -X POST http://${{ env.DEPLOY_SERVER }}:8081/api/system/execute \
+            -H "Content-Type: application/json" \
+            -d '{"command":"echo \"MCP Server is working!\""}' \
+            --connect-timeout 15)
+          echo "Execute response: $response"
+
+      - name: Test Docker Operations
+        run: |
+          echo "🐳 Testing Docker operations..."
+          
+          # Test container listing
+          response=$(curl -X GET http://${{ env.DEPLOY_SERVER }}:8081/api/docker/containers \
+            --connect-timeout 15)
+          echo "Container list response: $response"
+
+      - name: Test Process Management
+        run: |
+          echo "📊 Testing process management..."
+          
+          # Test process listing
+          response=$(curl -X GET http://${{ env.DEPLOY_SERVER }}:8081/api/process/list \
+            --connect-timeout 15)
+          echo "Process list response: $response"
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy, test-mcp-tools]
+    name: 📢 Deployment Notification
+    if: always() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Create summary
+        run: |
+          echo "## 🚀 MCP Server + React App Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment:** ${{ needs.deploy.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **MCP Tools Test:** ${{ needs.test-mcp-tools.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **React App URL:** http://${{ env.DEPLOY_SERVER }}:8090/" >> $GITHUB_STEP_SUMMARY
+          echo "- **MCP Server API:** http://${{ env.DEPLOY_SERVER }}:8081/health" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Management:** http://${{ env.DEPLOY_SERVER }}:9000" >> $GITHUB_STEP_SUMMARY
+          echo "- **Original MCP Server:** http://${{ env.DEPLOY_SERVER }}:8080" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.deploy.result }}" == "success" ] && [ "${{ needs.test-mcp-tools.result }}" == "success" ]; then
+            echo "🎉 All systems deployed and tested successfully!"
+          else
+            echo "❌ Deployment or testing failed. Check logs for details."
+          fi

@@ -35,17 +35,17 @@ GitHub Repository → GitHub Actions → Docker Build → Docker Compose Deploym
   - Network and volume management
   - Auto-restart and health check configuration
 
-### 2. Container Definitions
-- **`docker/mcp-server/`** - **MCP Server Extended Container**
-  - `Dockerfile` - Python-based MCP server
+### 2. Container Definitions (mcp-cicd-pipeline/docker-enhanced/)
+- **`mcp-server/`** - **MCP Server Extended Container**
+  - `Dockerfile` - Python-based MCP server with build dependencies
   - `mcp_server_extended.py` - Enhanced MCP server with container support
-- **`docker/nginx/`** - **Nginx Reverse Proxy Container**
+- **`nginx/`** - **Nginx Reverse Proxy Container**
   - `Dockerfile` - Alpine-based Nginx
   - `nginx.conf` - Optimized Nginx configuration
   - `default.conf` - Proxy and routing rules
-- **`docker/react-app/`** - **React Application Container**
-  - `Dockerfile` - Node.js 18 with development server
-- **`docker/deployment/`** - **Deployment Manager Container**
+- **`react-app/`** - **React Application Container**
+  - `Dockerfile` - Node.js 20 with Vite support
+- **`deployment/`** - **Deployment Manager Container**
   - `Dockerfile` - CI/CD automation container
   - `package.json` - Deployment tool dependencies
 

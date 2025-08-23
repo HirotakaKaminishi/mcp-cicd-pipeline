@@ -1,0 +1,21 @@
+{
+  "name": "deployment-manager",
+  "version": "1.0.0",
+  "description": "Docker-based deployment manager for MCP CI/CD pipeline",
+  "main": "deploy.js",
+  "scripts": {
+    "deploy": "node deploy.js",
+    "status": "node status.js",
+    "rollback": "node rollback.js",
+    "health": "node health-check.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "commander": "^11.0.0",
+    "dotenv": "^16.3.0",
+    "winston": "^3.11.0"
+  },
+  "keywords": ["deployment", "docker", "mcp", "ci-cd"],
+  "author": "MCP CI/CD Team",
+  "license": "MIT"
+}
