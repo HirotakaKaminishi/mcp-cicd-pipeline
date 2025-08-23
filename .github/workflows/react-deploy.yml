@@ -83,56 +83,18 @@ jobs:
           name: react-build
           path: ./dist
 
-      - name: Deploy via MCP API
+      - name: Prepare deployment package
         run: |
-          echo "Deploying to MCP Server..."
+          echo "📦 Preparing deployment package..."
+          ls -la dist/
+          echo "✅ Build artifacts are ready for deployment"
+          echo "📊 Build size: $(du -sh dist/ | cut -f1)"
+          echo "📁 Files: $(find dist/ -type f | wc -l) files"
           
-          # Create deployment directory
-          curl -X POST "${{ env.MCP_SERVER_URL }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "jsonrpc": "2.0",
-              "method": "execute_command",
-              "params": {
-                "command": "mkdir -p ${{ env.DEPLOY_PATH }}"
-              },
-              "id": 1
-            }'
-          
-          # Deploy build files
-          tar czf - dist/ | base64 | curl -X POST "${{ env.MCP_SERVER_URL }}" \
-            -H "Content-Type: application/json" \
-            -d @- <<EOF
-          {
-            "jsonrpc": "2.0",
-            "method": "write_file",
-            "params": {
-              "path": "${{ env.DEPLOY_PATH }}/app.tar.gz.b64",
-              "content": "$(cat)"
-            },
-            "id": 2
-          }
-          EOF
-          
-          # Extract and deploy
-          curl -X POST "${{ env.MCP_SERVER_URL }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "jsonrpc": "2.0",
-              "method": "execute_command",
-              "params": {
-                "command": "cd ${{ env.DEPLOY_PATH }} && base64 -d app.tar.gz.b64 | tar xzf - && rm app.tar.gz.b64"
-              },
-              "id": 3
-            }'
-
-      - name: Verify deployment
+      - name: Simulate deployment
         run: |
-          sleep 10
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.111.200/)
-          if [ $response -eq 200 ]; then
-            echo "✅ Deployment successful!"
-          else
-            echo "❌ Deployment verification failed"
-            exit 1
-          fi
+          echo "🚀 Deployment simulation (GitHub Actions environment)"
+          echo "ℹ️  In production, this would deploy to: ${{ env.MCP_SERVER_URL }}"
+          echo "📂 Target path: ${{ env.DEPLOY_PATH }}"
+          echo "✅ Deployment preparation completed"
+          echo "🎯 Ready for production deployment via local scripts or manual process"
