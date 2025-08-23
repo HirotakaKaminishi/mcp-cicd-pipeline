@@ -50,17 +50,31 @@ GitHub Repository → GitHub Actions → Docker Build → Docker Compose Deploym
   - `package.json` - Deployment tool dependencies
 
 ### 3. GitHub Actions Docker Workflow
-- **`.github/workflows/docker-cicd.yml`** - **Docker-based CI/CD Pipeline**
-  - Multi-stage Docker builds
-  - Container testing and deployment
-  - Health check verification
-  - Automated container orchestration
+- **`.github/workflows/docker-deploy.yml`** - **Enhanced Docker-based CI/CD Pipeline**
+  - Multi-stage Docker builds with comprehensive testing
+  - SSH-based container deployment and orchestration
+  - Automated health verification and monitoring
+  - systemd auto-start service configuration
+  - Full deployment rollback capabilities
 
-### 4. Application Source
+### 4. Deployment Scripts
+- **`scripts/`** - **Enhanced Deployment Scripts**
+  - `deploy.sh` - Linux/macOS deployment script with comprehensive checks
+  - `deploy.bat` - Windows deployment script with error handling
+  - `README.md` - Detailed deployment script documentation
+
+### 5. Application Source
 - **`03_sample_projects/react_apps/`** - **React Application Source**
   - Modern React with Vite build system
   - Container-optimized development workflow
   - Integrated testing and linting
+
+### 6. Setup Guides
+- **`GITHUB_ACTIONS_SETUP.md`** - **Complete GitHub Actions Configuration Guide**
+  - GitHub repository setup
+  - Secrets configuration
+  - Workflow troubleshooting
+  - CI/CD best practices
 
 ## 🔑 SSH Access Configuration
 
@@ -86,9 +100,43 @@ ssh -i mcp_docker_key root@192.168.111.200 "docker ps"
 ssh -i mcp_docker_key root@192.168.111.200 "docker compose logs -f"
 ```
 
-## 🚀 Docker-based Usage
+## 🚀 Deployment Options
 
-### 1. Local Development Setup
+### 1. Enhanced Deployment Scripts (Recommended)
+
+#### Windows Deployment
+```cmd
+# Enhanced deployment with full error checking
+scripts\deploy.bat
+
+# Deploy to specific environment
+scripts\deploy.bat production
+scripts\deploy.bat staging
+```
+
+#### Linux/macOS Deployment
+```bash
+# Make script executable (first time only)
+chmod +x scripts/deploy.sh
+
+# Deploy with comprehensive checks
+./scripts/deploy.sh
+
+# Deploy to specific environment
+./scripts/deploy.sh production
+./scripts/deploy.sh staging
+```
+
+#### Script Features
+✅ SSH connectivity verification  
+✅ Pre-deployment validation checks  
+✅ Automatic service conflict resolution  
+✅ Real-time deployment progress  
+✅ Health endpoint verification  
+✅ systemd auto-start configuration  
+✅ Detailed error reporting  
+
+### 2. Manual Local Development
 ```bash
 # Navigate to project directory
 cd C:\Users\hirotaka\Documents\work
@@ -134,20 +182,45 @@ curl http://192.168.111.200:8080
 curl http://192.168.111.200
 ```
 
-### 4. Automated Docker CI/CD
+### 4. GitHub Actions Automated CI/CD
+
+#### Setup (First Time Only)
+1. **Configure Secrets**: See `GITHUB_ACTIONS_SETUP.md` for detailed instructions
+   ```
+   Repository Settings → Secrets → Actions
+   Add: MCP_DOCKER_SSH_KEY (SSH private key content)
+   ```
+
+2. **Push to Repository**
+   ```bash
+   git add .
+   git commit -m "feat: enhanced Docker CI/CD with automated deployment"
+   git push origin main
+   ```
+
+#### Deployment Triggers
 ```bash
-# Triggers Docker-based deployment
+# Production deployment (automatic)
 git push origin main
 
-# View GitHub Actions (Docker workflow)
-# Check: .github/workflows/docker-cicd.yml
+# Development testing only
+git push origin develop
 
-# Deployment includes:
-# - Multi-container build
-# - Container testing
-# - Docker Compose deployment
-# - Health verification
+# Manual deployment trigger
+# GitHub → Actions → "Docker MCP Server CI/CD Pipeline" → Run workflow
 ```
+
+#### Workflow Features
+✅ **Test Phase**: React tests, Docker builds, linting  
+✅ **Deploy Phase**: SSH deployment, container orchestration  
+✅ **Verification**: Health checks, service validation  
+✅ **Auto-start**: systemd service configuration  
+✅ **Monitoring**: Real-time deployment status  
+
+#### Workflow File
+- **Location**: `.github/workflows/docker-deploy.yml`
+- **Documentation**: See `GITHUB_ACTIONS_SETUP.md`
+- **Troubleshooting**: Detailed guides in setup documentation
 
 ## 🔧 Docker Pipeline Details
 

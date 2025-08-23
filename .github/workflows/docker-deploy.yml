@@ -1,0 +1,177 @@
+name: Docker MCP Server CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOCKER_REGISTRY: "192.168.111.200"
+  MCP_SERVER_HOST: "192.168.111.200"
+  DEPLOY_PATH: "/var/deployment"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js for React App
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: '03_sample_projects/react_apps/package-lock.json'
+
+      - name: Install React dependencies
+        run: |
+          cd 03_sample_projects/react_apps
+          npm install
+
+      - name: Run React tests
+        run: |
+          cd 03_sample_projects/react_apps
+          npm test -- --watchAll=false
+
+      - name: Lint React code
+        run: |
+          cd 03_sample_projects/react_apps
+          npm run lint || true
+
+      - name: Test Docker builds
+        run: |
+          # Test MCP Server Docker build
+          docker build -f docker/mcp-server/Dockerfile docker/mcp-server/ -t test-mcp-server
+          
+          # Test Nginx Docker build
+          docker build -f docker/nginx/Dockerfile docker/nginx/ -t test-nginx
+          
+          # Test React App Docker build (if needed locally)
+          # docker build -f docker/react-app/Dockerfile . -t test-react-app
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    name: Build and Deploy Docker Stack
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.MCP_DOCKER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.MCP_SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy deployment files to server
+        run: |
+          # Copy Docker configuration
+          scp -r docker root@${{ env.MCP_SERVER_HOST }}:/root/
+          
+          # Copy docker-compose.yml
+          scp docker-compose.yml root@${{ env.MCP_SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
+          
+          # Copy React app source for volume mount
+          scp -r 03_sample_projects/react_apps root@${{ env.MCP_SERVER_HOST }}:/root/
+
+      - name: Deploy Docker Stack
+        run: |
+          ssh root@${{ env.MCP_SERVER_HOST }} << 'EOF'
+            cd ${{ env.DEPLOY_PATH }}
+            
+            # Stop existing containers if any
+            docker compose down || true
+            
+            # Build all images
+            docker compose build --no-cache
+            
+            # Start all containers
+            docker compose up -d
+            
+            # Wait for services to be ready
+            sleep 30
+            
+            # Check container status
+            docker compose ps
+          EOF
+
+      - name: Verify deployment
+        run: |
+          # Wait a bit more for services to stabilize
+          sleep 15
+          
+          # Test health endpoints
+          curl -f http://${{ env.MCP_SERVER_HOST }}/health || exit 1
+          curl -f http://${{ env.MCP_SERVER_HOST }}/service || exit 1
+          curl -f http://${{ env.MCP_SERVER_HOST }}:8080 || exit 1
+
+      - name: Setup auto-start service
+        run: |
+          ssh root@${{ env.MCP_SERVER_HOST }} << 'EOF'
+            # Create systemd service for auto-start
+            cat > /etc/systemd/system/mcp-docker.service << 'SYSTEMD_EOF'
+[Unit]
+Description=MCP Docker Compose Service
+Requires=docker.service
+After=docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${{ env.DEPLOY_PATH }}
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_EOF
+            
+            # Enable the service
+            systemctl daemon-reload
+            systemctl enable mcp-docker.service
+            systemctl status mcp-docker.service
+          EOF
+
+      - name: Post-deployment verification
+        run: |
+          ssh root@${{ env.MCP_SERVER_HOST }} << 'EOF'
+            echo "=== Final Deployment Verification ==="
+            cd ${{ env.DEPLOY_PATH }}
+            docker compose ps
+            echo ""
+            echo "=== Service Health Check ==="
+            curl -s http://localhost/health | python3 -m json.tool || echo "Health check failed"
+            echo ""
+            echo "=== MCP Server Status ==="
+            curl -s http://localhost:8080 | python3 -m json.tool || echo "MCP server check failed"
+          EOF
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test, build-and-deploy]
+    name: Send Notifications
+    if: always()
+    steps:
+      - name: Notify deployment status
+        run: |
+          if [ "${{ needs.build-and-deploy.result }}" == "success" ]; then
+            echo "✅ Docker deployment successful"
+            echo "🌐 Services available at:"
+            echo "  - Main site: http://${{ env.MCP_SERVER_HOST }}"
+            echo "  - Health check: http://${{ env.MCP_SERVER_HOST }}/health"
+            echo "  - MCP API: http://${{ env.MCP_SERVER_HOST }}:8080"
+          else
+            echo "❌ Docker deployment failed"
+            exit 1
+          fi
