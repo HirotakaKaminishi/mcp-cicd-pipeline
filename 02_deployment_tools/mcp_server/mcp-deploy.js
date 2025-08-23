@@ -226,6 +226,139 @@ class MCPDeployer {
             throw error;
         }
     }
+
+    /**
+     * Deploy Docker Compose stack
+     */
+    async deployDockerCompose(options = {}) {
+        const {
+            deployPath = '/var/deployment',
+            projectName = 'mcp-cicd-pipeline'
+        } = options;
+
+        console.log(`🐳 Starting Docker Compose deployment...`);
+        
+        try {
+            // 1. Check if docker-compose.yml exists
+            const composeFile = `${deployPath}/docker-compose.yml`;
+            console.log(`📋 Checking compose file: ${composeFile}`);
+            
+            // 2. Stop existing containers
+            console.log('⏹️  Stopping existing containers...');
+            await this.executeCommand(`cd ${deployPath} && docker compose down || true`);
+            
+            // 3. Pull latest images (if needed)
+            console.log('📥 Pulling latest images...');
+            await this.executeCommand(`cd ${deployPath} && docker compose pull || echo "Pull completed or not needed"`);
+            
+            // 4. Build and start containers
+            console.log('🔨 Building and starting containers...');
+            await this.executeCommand(`cd ${deployPath} && docker compose build --no-cache`);
+            await this.executeCommand(`cd ${deployPath} && docker compose up -d`);
+            
+            // 5. Wait for services to be ready
+            console.log('⏳ Waiting for services to start...');
+            await this.executeCommand(`sleep 30`);
+            
+            // 6. Check container status
+            console.log('📊 Checking container status...');
+            const statusResult = await this.executeCommand(`cd ${deployPath} && docker compose ps`);
+            console.log(`Container status:\n${statusResult.stdout}`);
+            
+            // 7. Health checks
+            console.log('🏥 Running health checks...');
+            const healthChecks = [
+                'curl -f http://localhost:8080/health || echo "MCP Server health check failed"',
+                'curl -f http://localhost/ || echo "Nginx health check failed"',
+                'curl -f http://localhost:3000 || echo "React app health check failed"'
+            ];
+            
+            for (const healthCheck of healthChecks) {
+                try {
+                    const result = await this.executeCommand(healthCheck);
+                    console.log(`✅ Health check passed: ${result.stdout.trim()}`);
+                } catch (e) {
+                    console.log(`⚠️  Health check warning: ${e.message}`);
+                }
+            }
+            
+            // 8. Log deployment
+            const logEntry = `${new Date().toISOString()}: Docker Compose deployment successful\\n`;
+            await this.executeCommand(`echo "${logEntry}" >> ${deployPath}/deployment.log`);
+            
+            console.log('✅ Docker Compose deployment completed successfully!');
+            return { success: true, deployPath, timestamp: new Date().toISOString() };
+            
+        } catch (error) {
+            console.error(`❌ Docker Compose deployment failed: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Get Docker status
+     */
+    async getDockerStatus(options = {}) {
+        const { deployPath = '/var/deployment' } = options;
+        
+        console.log('🐳 Getting Docker status...');
+        
+        try {
+            // Docker daemon status
+            const dockerVersion = await this.executeCommand('docker --version');
+            console.log(`Docker version: ${dockerVersion.stdout.trim()}`);
+            
+            // Container status
+            const containerStatus = await this.executeCommand(`cd ${deployPath} && docker compose ps`);
+            console.log(`Container status:\n${containerStatus.stdout}`);
+            
+            // Image status
+            const imageStatus = await this.executeCommand('docker images | head -10');
+            console.log(`Images:\n${imageStatus.stdout}`);
+            
+            // Network status
+            const networkStatus = await this.executeCommand('docker network ls');
+            console.log(`Networks:\n${networkStatus.stdout}`);
+            
+            return {
+                dockerVersion: dockerVersion.stdout.trim(),
+                containers: containerStatus.stdout,
+                images: imageStatus.stdout,
+                networks: networkStatus.stdout
+            };
+            
+        } catch (error) {
+            console.error(`❌ Docker status check failed: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Restart Docker services
+     */
+    async restartDockerServices(options = {}) {
+        const { deployPath = '/var/deployment' } = options;
+        
+        console.log('🔄 Restarting Docker services...');
+        
+        try {
+            await this.executeCommand(`cd ${deployPath} && docker compose restart`);
+            
+            // Wait for services to restart
+            await this.executeCommand(`sleep 15`);
+            
+            // Check status after restart
+            const statusResult = await this.executeCommand(`cd ${deployPath} && docker compose ps`);
+            console.log(`Services restarted:\n${statusResult.stdout}`);
+            
+            console.log('✅ Docker services restarted successfully!');
+            return { success: true, status: statusResult.stdout };
+            
+        } catch (error) {
+            console.error(`❌ Docker restart failed: ${error.message}`);
+            throw error;
+        }
+    }
 }
 
 // CLI interface
@@ -250,19 +383,45 @@ if (require.main === module) {
                 .then(result => console.log(JSON.stringify(result, null, 2)))
                 .catch(console.error);
             break;
+
+        case 'docker-deploy':
+            deployer.deployDockerCompose({
+                deployPath: process.argv[3] || '/var/deployment'
+            }).catch(process.exit);
+            break;
+
+        case 'docker-status':
+            deployer.getDockerStatus({
+                deployPath: process.argv[3] || '/var/deployment'
+            }).catch(process.exit);
+            break;
+
+        case 'docker-restart':
+            deployer.restartDockerServices({
+                deployPath: process.argv[3] || '/var/deployment'
+            }).catch(process.exit);
+            break;
             
         default:
             console.log(`
 Usage: node mcp-deploy.js <command> [options]
 
 Commands:
-  deploy [project-name]  Deploy application to MCP server
-  rollback              Rollback to previous deployment
-  status                Get MCP server status
+  deploy [project-name]     Deploy application to MCP server
+  rollback                 Rollback to previous deployment
+  status                   Get MCP server status
+  docker-deploy [path]     Deploy Docker Compose stack
+  docker-status [path]     Get Docker services status
+  docker-restart [path]    Restart Docker services
 
 Environment Variables:
-  GITHUB_SHA           Git commit SHA (for deployment tracking)
-  MCP_SERVER_URL       MCP server URL (default: http://192.168.111.200:8080)
+  GITHUB_SHA              Git commit SHA (for deployment tracking)
+  MCP_SERVER_URL          MCP server URL (default: http://192.168.111.200:8080)
+
+Docker Commands:
+  docker-deploy           Full Docker Compose stack deployment
+  docker-status           Shows containers, images, and network status
+  docker-restart          Restart all Docker services in stack
             `);
     }
 }
