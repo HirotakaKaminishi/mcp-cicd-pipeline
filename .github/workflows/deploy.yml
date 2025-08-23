@@ -159,6 +159,39 @@ jobs:
             docker builder prune --keep-storage=1GB --filter="until=168h" -f
             
             echo "🎉 Deployment completed successfully!"
+            
+            # Deploy MCP configuration files
+            echo "⚙️ Deploying MCP configuration..."
+            mkdir -p /root/mcp-config
+            cat > /root/mcp-config/.mcp.json << 'MCP_EOF'
+{
+  "servers": {
+    "remote-extended": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "@anthropic-ai/mcp-client-stdio", 
+        "http://192.168.111.200:8080"
+      ],
+      "env": {
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    },
+    "remote-new": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "@anthropic-ai/mcp-client-stdio", 
+        "http://192.168.111.200:8081"
+      ],
+      "env": {
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+  }
+}
+MCP_EOF
+            echo "✅ MCP configuration deployed to /root/mcp-config/.mcp.json"
           EOF
 
       - name: Verify deployment
