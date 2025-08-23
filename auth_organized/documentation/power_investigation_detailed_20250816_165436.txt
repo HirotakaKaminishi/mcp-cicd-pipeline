@@ -1,0 +1,147 @@
+﻿**********************
+Windows PowerShell トランスクリプト開始
+開始時刻: 20250816165436
+ユーザー名: DESKTOP-5LMPAVN\hirotaka
+RunAs ユーザー: DESKTOP-5LMPAVN\hirotaka
+構成名: 
+コンピューター: DESKTOP-5LMPAVN (Microsoft Windows NT 10.0.26100.0)
+ホスト アプリケーション: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File C:\Users\hirotaka\Documents\work\auth\detailed_power_investigation.ps1
+プロセス ID: 24540
+PSVersion: 5.1.26100.4768
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.4768
+BuildVersion: 10.0.26100.4768
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+トランスクリプトが開始されました。出力ファイル: C:\Users\hirotaka\Documents\work\auth\power_investigation_detailed_20250816_165436.txt
+
+1. Analyzing unexpected shutdowns (Event ID 6008)...
+Recent Unexpected Shutdowns:
+
+TimeGenerated
+-------------
+2025/08/16 16:22:56
+2025/08/16 15:50:05
+2025/08/16 15:09:20
+2025/08/16 14:56:20
+2025/08/16 14:25:21
+2025/08/16 14:22:21
+2025/08/16 12:41:57
+2025/08/16 12:11:24
+2025/08/16 11:35:37
+2025/08/16 10:42:58
+2025/08/16 2:24:42
+2025/08/15 23:28:40
+2025/08/11 22:38:02
+2025/08/11 12:24:14
+2025/08/11 9:26:14
+
+
+
+2. Checking for system crashes (BugCheck)...
+笨・No system crashes (BugCheck) found
+
+3. Checking Kernel-Power events...
+Kernel-Power Events:
+
+TimeGenerated       EventID
+-------------       -------
+2025/08/16 16:22:48     172
+2025/08/16 16:22:48      41
+2025/08/16 16:22:48     125
+2025/08/16 15:49:57     172
+2025/08/16 15:49:57      41
+2025/08/16 15:49:57     125
+2025/08/16 15:09:12     172
+2025/08/16 15:09:12      41
+2025/08/16 15:09:12     125
+2025/08/16 14:56:12     172
+
+
+
+4. System hardware information...
+Hardware Information:
+
+
+Name  : ProcessorName
+Value : AMD Ryzen 9 6900HX with Radeon Graphics
+
+Name  : ProcessorCores
+Value : 8
+
+Name  : Manufacturer
+Value : Tianbei
+
+Name  : TotalRAM_GB
+Value : 32
+
+Name  : Model
+Value : GEM12
+
+Name  : BIOSVersion
+Value : 1.00
+
+Name  : BIOSDate
+Value : 20240422000000.000000+000
+
+
+
+
+5. Power supply information...
+Power Configuration:
+電源設定の GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  (高パフォーマンス)
+
+Last Wake Source:
+スリープ状態の解除履歴カウント - 0
+
+6. Recent Critical and Error events...
+パラメーター 'EntryType の引数を確認できません。引数 "Critical" は、ValidateSet 属性で指定されたセット "Error,Information,FailureAudit,SuccessAudit,Warni
+ng" に属していません。このセットの引数を指定して、コマンドを再度実行してください。
+    + CategoryInfo          : InvalidData: (:) [Get-EventLog]、ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationError,Microsoft.PowerShell.Commands.GetEventLogCommand
+    + PSComputerName        : 192.168.111.163
+パラメーター 'EntryType の引数を確認できません。引数 "Critical" は、ValidateSet 属性で指定されたセット "Error,Information,FailureAudit,SuccessAudit,Warn
+ing" に属していません。このセットの引数を指定して、コマンドを再度実行してください。
+    + CategoryInfo          : InvalidData: (:) [Get-EventLog]、ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationError,Microsoft.PowerShell.Commands.GetEventLogCommand
+    + PSComputerName        : 192.168.111.163
+
+Recent Critical/Error Events:
+
+ + = * 70
+投 ANALYSIS RESULTS
+= * 70
+Target System: WINDOWS-8R73QDH (Tianbei GEM12)
+Processor: AMD Ryzen 9 6900HX with Radeon Graphics         (8 cores)
+Memory: 32 GB
+BIOS: 1.00 (20240422000000.000000+000)
+
+FINDINGS:
+閥 CRITICAL: 26 unexpected shutdowns detected
+   - This indicates sudden power loss or system crashes
+   - Pattern analysis from timestamps above
+
+PROBABLE CAUSES:
+1. Power Supply Unit (PSU) failure/insufficient capacity
+2. Overheating (CPU, GPU, or system)
+3. Memory (RAM) issues
+4. Motherboard power regulation problems
+5. Unstable power from wall outlet/UPS
+
+RECOMMENDED ACTIONS:
+1. 肌 IMMEDIATE: Check PSU wattage vs system requirements
+2. 牽・・URGENT: Monitor CPU/GPU temperatures during use
+3. 沈 TEST: Run Windows Memory Diagnostic (mdsched.exe)
+4. 伯 CHECK: All internal power connections
+5. 投 MONITOR: Use HWiNFO64 for real-time temperature/voltage monitoring
+6. 笞｡ VERIFY: Wall outlet voltage stability
+7. ・ UPDATE: BIOS to latest version
+
+SEVERITY: HIGH - System instability affecting productivity
+**********************
+Windows PowerShell トランスクリプト終了
+終了時刻: 20250816165446
+**********************

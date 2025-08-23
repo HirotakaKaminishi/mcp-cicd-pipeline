@@ -1,0 +1,50 @@
+        font/eot
+        font/otf
+        font/ttf
+        image/svg+xml
+        text/css
+        text/javascript
+        text/plain
+        text/xml;
+    
+    # Brotli compression (if module available)
+    # brotli on;
+    # brotli_comp_level 6;
+    # brotli_min_length 1024;
+    # brotli_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    
+    # Rate limiting zones
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=login:10m rate=1r/s;
+    limit_req_zone $binary_remote_addr zone=general:10m rate=5r/s;
+    
+    # Connection limiting
+    limit_conn_zone $binary_remote_addr zone=addr:10m;
+    
+    # Map for real IP (when behind load balancer)
+    map $http_x_forwarded_for $real_ip {
+        default $remote_addr;
+        ~^([0-9.]+) $1;
+    }
+    
+    # Security headers map
+    map $sent_http_content_type $expires {
+        default                    off;
+        text/html                  epoch;
+        text/css                   1y;
+        application/javascript     1y;
+        application/json           off;
+        ~image/                    1M;
+        ~font/                     1y;
+    }
+    
+    # Logging Configuration
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+    
+    log_format detailed '$remote_addr - $remote_user [$time_local] "$request" '
+                       '$status $body_bytes_sent "$http_referer" '
+                       '"$http_user_agent" "$http_x_forwarded_for" '
+                       'rt=$request_time uct="$upstream_connect_time" '
+                       'uht="$upstream_header_time" urt="$upstream_response_time"';

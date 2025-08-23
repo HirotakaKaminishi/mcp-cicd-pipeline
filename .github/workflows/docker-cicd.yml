@@ -1,0 +1,190 @@
+name: Docker-based CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  MCP_SERVER_URL: http://192.168.111.200:8080
+  DOCKER_COMPOSE_VERSION: 2.21.0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test Application
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: '03_sample_projects/react_apps/package-lock.json'
+    
+    - name: Install React App Dependencies
+      working-directory: ./03_sample_projects/react_apps
+      run: npm ci
+    
+    - name: Run ESLint
+      working-directory: ./03_sample_projects/react_apps
+      run: npm run lint
+    
+    - name: Run Tests
+      working-directory: ./03_sample_projects/react_apps
+      run: npm test -- --coverage --watchAll=false
+    
+    - name: Build React App
+      working-directory: ./03_sample_projects/react_apps
+      run: npm run build
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Build and Deploy Docker Containers
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker BuildX
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create Docker Network
+      run: docker network create mcp-network || true
+    
+    - name: Build MCP Server Image
+      run: |
+        docker build -t mcp-server:latest ./docker/mcp-server
+    
+    - name: Build Nginx Image
+      run: |
+        docker build -t nginx-proxy:latest ./docker/nginx
+    
+    - name: Build React App Image
+      run: |
+        cp -r ./03_sample_projects/react_apps/* ./docker/react-app/ || true
+        docker build -t react-app:latest ./docker/react-app
+    
+    - name: Build Deployment Manager Image
+      run: |
+        cp -r ./02_deployment_tools/mcp_server/* ./docker/deployment/ || true
+        docker build -t deployment-manager:latest ./docker/deployment
+    
+    - name: Save Docker Images
+      run: |
+        docker save mcp-server:latest | gzip > mcp-server.tar.gz
+        docker save nginx-proxy:latest | gzip > nginx-proxy.tar.gz
+        docker save react-app:latest | gzip > react-app.tar.gz
+        docker save deployment-manager:latest | gzip > deployment-manager.tar.gz
+    
+    - name: Deploy to MCP Server
+      env:
+        MCP_SERVER_URL: ${{ env.MCP_SERVER_URL }}
+      run: |
+        # Create deployment directory
+        curl -X POST $MCP_SERVER_URL \
+          -H "Content-Type: application/json" \
+          -d '{
+            "jsonrpc": "2.0",
+            "method": "execute_command",
+            "params": {
+              "command": "mkdir -p /var/deployment/docker-images /var/deployment/configs"
+            },
+            "id": 1
+          }'
+        
+        # Copy docker-compose file
+        curl -X POST $MCP_SERVER_URL \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"jsonrpc\": \"2.0\",
+            \"method\": \"write_file\",
+            \"params\": {
+              \"path\": \"/var/deployment/docker-compose.yml\",
+              \"content\": \"$(cat docker-compose.yml | sed 's/\"/\\\"/g' | tr '\n' ' ')\"
+            },
+            \"id\": 2
+          }"
+        
+        # Stop existing containers
+        curl -X POST $MCP_SERVER_URL \
+          -H "Content-Type: application/json" \
+          -d '{
+            "jsonrpc": "2.0",
+            "method": "execute_command",
+            "params": {
+              "command": "cd /var/deployment && docker-compose down --remove-orphans"
+            },
+            "id": 3
+          }'
+        
+        # Transfer and load Docker images (simplified approach)
+        echo "Docker images built and ready for deployment"
+        
+        # Deploy with Docker Compose
+        curl -X POST $MCP_SERVER_URL \
+          -H "Content-Type: application/json" \
+          -d '{
+            "jsonrpc": "2.0",
+            "method": "execute_command",
+            "params": {
+              "command": "cd /var/deployment && docker-compose up -d --build"
+            },
+            "id": 4
+          }'
+    
+    - name: Health Check
+      run: |
+        sleep 30
+        curl -X POST $MCP_SERVER_URL \
+          -H "Content-Type: application/json" \
+          -d '{
+            "jsonrpc": "2.0",
+            "method": "health_check",
+            "params": {},
+            "id": 5
+          }'
+    
+    - name: Verify Deployment
+      run: |
+        # Check if services are running
+        curl -X POST $MCP_SERVER_URL \
+          -H "Content-Type: application/json" \
+          -d '{
+            "jsonrpc": "2.0",
+            "method": "execute_command",
+            "params": {
+              "command": "docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\""
+            },
+            "id": 6
+          }'
+        
+        # Test endpoints
+        curl -f http://192.168.111.200/ || exit 1
+        curl -f http://192.168.111.200/health || exit 1
+        curl -f http://192.168.111.200/service || exit 1
+
+  notify:
+    needs: [test, build-and-deploy]
+    runs-on: ubuntu-latest
+    name: Notify Deployment Status
+    if: always()
+    
+    steps:
+    - name: Deployment Success Notification
+      if: needs.build-and-deploy.result == 'success'
+      run: |
+        echo "✅ Docker-based deployment completed successfully!"
+        echo "🌐 Application available at: http://192.168.111.200"
+        echo "🔧 MCP API available at: http://192.168.111.200:8080"
+    
+    - name: Deployment Failure Notification
+      if: needs.build-and-deploy.result == 'failure'
+      run: |
+        echo "❌ Docker deployment failed!"
+        echo "🔍 Check the deployment logs for more information"
+        exit 1

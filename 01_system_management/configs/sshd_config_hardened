@@ -1,0 +1,85 @@
+﻿# Hardened SSH Configuration for MCP Server
+# File: /etc/ssh/sshd_config
+# Backup original: sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+
+# Protocol and Port Configuration
+Protocol 2
+Port 2222
+# Note: Change from default port 22 to reduce automated attacks
+
+# Address and Interface Binding
+#ListenAddress 0.0.0.0
+#ListenAddress ::
+AddressFamily inet
+# Note: Use 'inet6' for IPv6 or 'any' for both
+
+# Authentication Configuration
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys2
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+UsePAM yes
+
+# Key Exchange and Encryption
+KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
+
+# Connection Limits and Timeouts
+MaxAuthTries 3
+MaxSessions 2
+MaxStartups 2:30:10
+LoginGraceTime 60
+ClientAliveInterval 300
+ClientAliveCountMax 0
+
+# User and Group Restrictions
+AllowUsers mcp-admin
+# Note: Replace 'mcp-admin' with your actual admin username
+# AllowGroups ssh-users
+# DenyUsers root guest
+# DenyGroups guests
+
+# Disable Unused Features
+AllowAgentForwarding no
+AllowTcpForwarding no
+X11Forwarding no
+X11DisplayOffset 10
+X11UseLocalhost yes
+PermitTunnel no
+GatewayPorts no
+PermitUserEnvironment no
+
+# Logging and Monitoring
+SyslogFacility AUTH
+LogLevel VERBOSE
+# Note: VERBOSE logs key fingerprints for security monitoring
+
+# Security Features
+StrictModes yes
+IgnoreRhosts yes
+HostbasedAuthentication no
+PermitUserRC no
+PrintMotd no
+PrintLastLog yes
+TCPKeepAlive yes
+Compression delayed
+
+# Banner Configuration
+Banner /etc/ssh/ssh_banner
+# Note: Create a security banner file
+
+# Subsystem Configuration (for SFTP if needed)
+Subsystem sftp /usr/lib/openssh/sftp-server -l INFO
+
+# Match Blocks for Specific Users/Groups
+# Example: Restricted SFTP-only user
+# Match Group sftp-only
+#     ChrootDirectory /home/sftp/%u
+#     ForceCommand internal-sftp
+#     AllowTcpForwarding no
+#     AllowAgentForwarding no
+#     PermitTunnel no
+#     X11Forwarding no

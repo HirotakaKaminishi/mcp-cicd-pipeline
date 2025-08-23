@@ -1,0 +1,162 @@
+name: MCP Server CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  MCP_SERVER_URL: http://192.168.111.200:8080
+  DEPLOY_PATH: /root/mcp_project
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run linting
+        run: npm run lint
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    name: Build Application
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    name: Deploy via MCP Server
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+
+      - name: Deploy to MCP Server
+        env:
+          MCP_SERVER_URL: ${{ env.MCP_SERVER_URL }}
+        run: |
+          # Create deployment directory
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "jsonrpc": "2.0",
+              "method": "execute_command",
+              "params": {
+                "command": "mkdir -p ${{ env.DEPLOY_PATH }}/releases/$(date +%Y%m%d_%H%M%S)"
+              },
+              "id": 1
+            }'
+
+          # Copy application files
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "jsonrpc": "2.0",
+              "method": "execute_command",
+              "params": {
+                "command": "rsync -av dist/ ${{ env.DEPLOY_PATH }}/current/"
+              },
+              "id": 2
+            }'
+
+          # Restart application service
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "jsonrpc": "2.0",
+              "method": "manage_service",
+              "params": {
+                "service": "mcp-app",
+                "action": "restart"
+              },
+              "id": 3
+            }'
+
+      - name: Verify deployment
+        run: |
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "jsonrpc": "2.0",
+              "method": "get_system_info",
+              "id": 4
+            }'
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test, build, deploy]
+    name: Send Notifications
+    if: always()
+    steps:
+      - name: Notify deployment status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ Deployment successful"
+            curl -X POST "${{ env.MCP_SERVER_URL }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "jsonrpc": "2.0",
+                "method": "write_file",
+                "params": {
+                  "path": "/var/log/deployment.log",
+                  "content": "$(date): Deployment successful - ${{ github.sha }}"
+                },
+                "id": 5
+              }'
+          else
+            echo "❌ Deployment failed"
+            curl -X POST "${{ env.MCP_SERVER_URL }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "jsonrpc": "2.0",
+                "method": "write_file",
+                "params": {
+                  "path": "/var/log/deployment.log",
+                  "content": "$(date): Deployment failed - ${{ github.sha }}"
+                },
+                "id": 6
+              }'
+          fi

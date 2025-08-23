@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Server CI/CD Platform</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        .status {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .status.running {
+            background: #d4edda;
+            color: #155724;
+        }
+        .links {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .links h3 {
+            color: #667eea;
+            margin-bottom: 1.5rem;
+        }
+        .link-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .link-item {
+            display: block;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #333;
+            transition: background-color 0.3s ease;
+        }
+        .link-item:hover {
+            background: #e9ecef;
+        }
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 3rem;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MCP Server CI/CD Platform</h1>
+            <p>Complete containerized CI/CD pipeline with MCP Server integration</p>
+        </div>
+
+        <div class="cards">
+            <div class="card">
+                <h3>🚀 MCP Server</h3>
+                <p>Extended MCP Server with Docker support</p>
+                <span class="status running" id="mcp-status">Checking...</span>
+            </div>
+            
+            <div class="card">
+                <h3>⚡ React Application</h3>
+                <p>Modern React app with Vite build system</p>
+                <span class="status running">Running</span>
+            </div>
+            
+            <div class="card">
+                <h3>🔧 Deployment Manager</h3>
+                <p>Automated deployment and CI/CD management</p>
+                <span class="status running">Active</span>
+            </div>
+        </div>
+
+        <div class="links">
+            <h3>🔗 Quick Links</h3>
+            <div class="link-grid">
+                <a href="/health" class="link-item">
+                    <strong>Health Check</strong><br>
+                    System health status
+                </a>
+                <a href="/service" class="link-item">
+                    <strong>Service Status</strong><br>
+                    Service information
+                </a>
+                <a href="/api/mcp/" class="link-item">
+                    <strong>MCP API</strong><br>
+                    MCP Server endpoint
+                </a>
+                <a href="/app/" class="link-item">
+                    <strong>React App</strong><br>
+                    Main application
+                </a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>MCP Server CI/CD Platform - Fully containerized with Docker Compose</p>
+        </div>
+    </div>
+
+    <script>
+        // Check MCP server status
+        async function checkMCPStatus() {
+            try {
+                const response = await fetch('/api/mcp/');
+                const data = await response.json();
+                document.getElementById('mcp-status').textContent = 'Running';
+            } catch (error) {
+                document.getElementById('mcp-status').textContent = 'Offline';
+                document.getElementById('mcp-status').className = 'status';
+                document.getElementById('mcp-status').style.background = '#f8d7da';
+                document.getElementById('mcp-status').style.color = '#721c24';
+            }
+        }
+
+        checkMCPStatus();
+    </script>
+</body>
+</html>

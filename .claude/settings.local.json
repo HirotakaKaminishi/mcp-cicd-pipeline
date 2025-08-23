@@ -1,0 +1,80 @@
+{
+  "env": {
+    "LANGUAGE": "ja",
+    "LOCALE": "ja-JP",
+    "UI_LANGUAGE": "japanese"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "LS(*)",
+      "Grep(*)",
+      "WebFetch(*)",
+      "Task(*)",
+      "MultiEdit(*)",
+      "NotebookEdit(*)",
+      "BashOutput(*)",
+      "KillBash(*)",
+      "TodoWrite(*)",
+      "ExitPlanMode(*)",
+      "WebSearch(*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(del /f /s /q:*)",
+      "Bash(format:*)",
+      "Bash(fdisk:*)",
+      "Bash(shutdown:*)",
+      "Bash(reboot:*)",
+      "Bash(halt:*)",
+      "Bash(poweroff:*)",
+      "Bash(dd:*)",
+      "Bash(mkfs:*)",
+      "Bash(parted:*)",
+      "Bash(diskpart:*)",
+      "Bash(reg delete:*)",
+      "Bash(sc delete:*)",
+      "Bash(netsh advfirewall:*)",
+      "Bash(curl *| bash:*)",
+      "Bash(wget *| bash:*)",
+      "Bash(curl *| sh:*)",
+      "Bash(wget *| sh:*)",
+      "Bash(chmod 777:*)",
+      "Bash(chown root:*)",
+      "Bash(sudo rm:*)",
+      "Bash(sudo dd:*)",
+      "Bash(sudo mkfs:*)",
+      "Write(*/.ssh/*)",
+      "Write(*/authorized_keys)",
+      "Write(*/passwd)",
+      "Write(*/shadow)",
+      "Write(*/sudoers)",
+      "Write(*/.bashrc)",
+      "Write(*/.zshrc)",
+      "Write(*/crontab)",
+      "Edit(*/.ssh/*)",
+      "Edit(*/authorized_keys)",
+      "Edit(*/passwd)",
+      "Edit(*/shadow)",
+      "Edit(*/sudoers)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command \"Get-Content \\\"$env:CLAUDE_PROJECT_DIR\\CLAUDE.md\\\" -Encoding UTF8 | Write-Output\""
+          }
+        ]
+      }
+    ]
+  }
+}

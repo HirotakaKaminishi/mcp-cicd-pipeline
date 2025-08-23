@@ -1,0 +1,33 @@
+# 調査PC (192.168.111.163) で実行するコマンド
+# 管理者権限のPowerShellで順番に実行してください
+
+# 1. WinRM基本設定
+Enable-PSRemoting -Force -SkipNetworkProfileCheck
+winrm quickconfig -Force
+
+# 2. 認証設定を変更
+winrm set winrm/config/service '@{AllowUnencrypted="true"}'
+winrm set winrm/config/service/auth '@{Basic="true"}'
+winrm set winrm/config/client '@{AllowUnencrypted="true"}'
+
+# 3. 信頼するホストを追加
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
+
+# 4. ファイアウォール設定
+New-NetFirewallRule -Name "WinRM-HTTP" -DisplayName "WinRM-HTTP" -Protocol TCP -LocalPort 5985 -Action Allow -Force
+Enable-NetFirewallRule -Name "WINRM-HTTP-In-TCP"
+
+# 5. WinRMサービス再起動
+Restart-Service WinRM
+
+# 6. ユーザー権限確認
+net localgroup Administrators
+# "pc" ユーザーが含まれていることを確認
+
+# 7. 設定確認
+winrm get winrm/config
+Get-Service WinRM
+
+# 8. メモリテスト実行（これが本来の目的）
+mdsched.exe
+# → "今すぐ再起動して問題の有無を確認する" を選択

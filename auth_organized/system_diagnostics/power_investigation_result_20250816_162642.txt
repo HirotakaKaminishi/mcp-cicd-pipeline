@@ -1,0 +1,224 @@
+﻿**********************
+Windows PowerShell トランスクリプト開始
+開始時刻: 20250816162642
+ユーザー名: DESKTOP-5LMPAVN\hirotaka
+RunAs ユーザー: DESKTOP-5LMPAVN\hirotaka
+構成名: 
+コンピューター: DESKTOP-5LMPAVN (Microsoft Windows NT 10.0.26100.0)
+ホスト アプリケーション: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File C:\Users\hirotaka\Documents\work\auth\remote_power_investigation.ps1
+プロセス ID: 18288
+PSVersion: 5.1.26100.4768
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.4768
+BuildVersion: 10.0.26100.4768
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+トランスクリプトが開始されました。出力ファイル: C:\Users\hirotaka\Documents\work\auth\power_investigation_result_20250816_162642.txt
+
+[1] System Information
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+
+[2] Unexpected Shutdowns (Event ID 6008)
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+No unexpected shutdowns found
+
+[3] Power-Related Errors (Kernel-Power)
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+No power-related errors found
+
+[4] Normal Shutdowns (Event ID 1074)
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+
+[5] Blue Screen History (BugCheck)
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+No blue screens found
+
+[6] Power Configuration
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+
+
+[7] Last Wake Information
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+
+
+[8] Battery Information
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+No battery detected (Desktop PC)
+
+[9] Temperature Information
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+Temperature information not available
+
+[10] Memory Dump Settings
+- * 40
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. If
+ the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS t
+ransport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.cmd 
+to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more inf
+ormation about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ トピックを参
+照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+[192.168.111.163] リモート サーバー 192.168.111.163 への接続に失敗し、次のエラー メッセージが返されました: The WinRM client cannot process the request. I
+f the authentication scheme is different from Kerberos, or if the client computer is not joined to a domain, then HTTPS
+ transport must be used or the destination machine must be added to the TrustedHosts configuration setting. Use winrm.c
+md to configure TrustedHosts. Note that computers in the TrustedHosts list might not be authenticated. You can get more
+ information about that by running the following command: winrm help config.詳細については、about_Remote_Troubleshooting のヘルプ ト
+ピックを参照してください。
+    + CategoryInfo          : OpenError: (192.168.111.163:String) [], PSRemotingTransportException
+    + FullyQualifiedErrorId : ServerNotTrusted,PSSessionStateBroken
+
+ + = * 60
+Investigation Complete!
+Results saved to: C:\Users\hirotaka\Documents\work\auth\power_investigation_result_20250816_162642.txt
+**********************
+Windows PowerShell トランスクリプト終了
+終了時刻: 20250816162644
+**********************

@@ -1,0 +1,104 @@
+# C6無効化設定の適用と確認コマンド
+# 調査PC (192.168.111.163) で実行してください
+# PowerShellで以下のコマンドを実行
+
+# ============================================
+# 設定適用コマンド
+# ============================================
+
+# 1. 現在の設定を適用（C6無効化を有効化）
+powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e
+
+# ============================================
+# 確認コマンド
+# ============================================
+
+# 2. 現在の電源プラン確認
+powercfg /getactivescheme
+
+# 3. プロセッサ電源管理の詳細確認
+powercfg /query scheme_current sub_processor
+
+# 4. C6関連設定の確認（詳細表示）
+powercfg /query 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 | Select-String "プロセッサ|アイドル|パーキング"
+
+# 5. CPU現在の動作状態確認
+Get-WmiObject Win32_Processor | Select-Object Name, CurrentClockSpeed, MaxClockSpeed, LoadPercentage
+
+# ============================================
+# 一括実行版（設定適用と確認）
+# ============================================
+
+powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e; powercfg /getactivescheme; Get-WmiObject Win32_Processor | Select-Object Name, CurrentClockSpeed, LoadPercentage
+
+# ============================================
+# システム安定性モニタリング
+# ============================================
+
+# 6. 最近のシャットダウンイベント確認
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=41} -MaxEvents 5 | Format-Table TimeCreated
+
+# 7. CPU温度確認（可能な場合）
+Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace "root/wmi" | ForEach-Object { $temp = ($_.CurrentTemperature / 10) - 273.15; Write-Host "Temperature: $([math]::Round($temp, 1))°C" }
+
+# 8. システムアップタイム確認
+$uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; Write-Host "System Uptime: $($uptime.Days)d $($uptime.Hours)h $($uptime.Minutes)m"
+
+# ============================================
+# 再起動コマンド（C6設定を完全適用）
+# ============================================
+
+# 9. システム再起動（管理者権限で実行）
+# Restart-Computer -Force
+
+# 注意: 再起動前に作業中のファイルを保存してください
+
+# ============================================
+# 再起動後の確認コマンド
+# ============================================
+
+# 10. 再起動後のC6無効化確認
+powercfg /query 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 5d76a2ca-e8c0-402f-a133-2158492d58ad
+
+# 11. イベントログで新しいシャットダウンがないか確認
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=41; StartTime=(Get-Date).AddHours(-1)} | Measure-Object
+
+# ============================================
+# 継続的モニタリング（30分テスト用）
+# ============================================
+
+# 12. 30分間のCPU状態監視（5秒間隔）
+1..360 | ForEach-Object { 
+    $cpu = Get-WmiObject Win32_Processor | Select-Object -First 1
+    Write-Host "$(Get-Date -Format 'HH:mm:ss') - CPU: $($cpu.LoadPercentage)% @ $($cpu.CurrentClockSpeed)MHz"
+    Start-Sleep -Seconds 5
+}
+
+# ============================================
+# 問題が解決しない場合の追加設定
+# ============================================
+
+# 13. CPU最小値を下げる（80%→5%）
+powercfg /setacvalueindex 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 893dee8e-2bef-41e0-89c6-b55d0929964c 5
+
+# 14. CPU最大値を100%に戻す
+powercfg /setacvalueindex 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 bc5038f7-23e0-4960-96da-33abaf5935ec 100
+
+# 15. 設定適用
+powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e
+
+# ============================================
+# 備考
+# ============================================
+# C6無効化設定は既に適用済みです。
+# システム再起動後、30分間シャットダウンが発生しないか
+# 監視してください。
+# 
+# 現在の設定:
+# - C6ステート: 無効化済み
+# - プロセッサパーキング: 無効化済み
+# - AMDアイドル最適化: 無効化済み
+# - CPU最小: 80%
+# - CPU最大: 80%
+#
+# 31回のシャットダウン問題がこれで解決されることを期待します。

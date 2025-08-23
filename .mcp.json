@@ -1,0 +1,24 @@
+{
+  "servers": {
+    "remote-extended": {
+      "command": "python",
+      "args": [
+        "C:\\Users\\hirotaka\\Documents\\work\\mcp_server_wrapper.py"
+      ],
+      "env": {
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    },
+    "remote-new": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "@anthropic-ai/mcp-client-stdio", 
+        "http://192.168.111.200:8081"
+      ],
+      "env": {
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+  }
+}

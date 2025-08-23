@@ -1,0 +1,80 @@
+# 最終最適化コマンド - シャットダウン問題解決
+# 調査PC (192.168.111.163) で実行してください
+
+# ============================================
+# 重要：CPU設定の最適化（電力消費削減）
+# ============================================
+
+# CPU最小値を80%から5%に変更（大幅な省電力化）
+powercfg /setacvalueindex 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 893dee8e-2bef-41e0-89c6-b55d0929964c 5
+
+# CPU最大値を80%から100%に変更（必要時のみ高性能）
+powercfg /setacvalueindex 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 bc5038f7-23e0-4960-96da-33abaf5935ec 100
+
+# 設定適用
+powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e
+
+# ============================================
+# 一括実行版（推奨）
+# ============================================
+
+powercfg /setacvalueindex 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 893dee8e-2bef-41e0-89c6-b55d0929964c 5; powercfg /setacvalueindex 381b4222-f694-41f0-9685-ff5bb260df2e 54533251-82be-4824-96c1-47b60b740d00 bc5038f7-23e0-4960-96da-33abaf5935ec 100; powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e
+
+# ============================================
+# 設定確認
+# ============================================
+
+# 新しい設定の確認
+powercfg /query scheme_current sub_processor
+
+# ============================================
+# システム再起動（C6無効化を完全適用）
+# ============================================
+
+# 再起動コマンド（管理者権限で実行）
+Restart-Computer -Force
+
+# ============================================
+# 再起動後の安定性テスト
+# ============================================
+
+# 1. システムアップタイム確認
+$uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+Write-Host "Uptime: $($uptime.Days)d $($uptime.Hours)h $($uptime.Minutes)m"
+
+# 2. 最新のシャットダウンイベント確認
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=41} -MaxEvents 1 | Format-Table TimeCreated
+
+# 3. CPU動作確認
+Get-WmiObject Win32_Processor | Select-Object Name, CurrentClockSpeed, MaxClockSpeed, LoadPercentage
+
+# ============================================
+# 30分モニタリングスクリプト
+# ============================================
+
+# 30分間のシステム監視（1分間隔）
+1..30 | ForEach-Object {
+    $time = Get-Date -Format "HH:mm:ss"
+    $cpu = Get-WmiObject Win32_Processor | Select-Object -First 1
+    $uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+    Write-Host "$time | Minute $_ | CPU: $($cpu.LoadPercentage)% @ $($cpu.CurrentClockSpeed)MHz | Uptime: $($uptime.TotalMinutes) min"
+    Start-Sleep -Seconds 60
+}
+
+# ============================================
+# 現在の設定まとめ
+# ============================================
+# 
+# 適用済み設定:
+# ✅ C6ステート: 無効化
+# ✅ プロセッサパーキング: 無効化
+# ✅ AMDアイドル最適化: 無効化
+# ⚠️ CPU最小: 80% → 5%に変更推奨
+# ⚠️ CPU最大: 80% → 100%に変更推奨
+#
+# これらの設定により、以下の問題が解決されます：
+# 1. C6ステートによる不正なシャットダウン
+# 2. CPU最小80%による過剰な電力消費
+# 3. 電源管理の不安定性
+#
+# 31回のシャットダウン問題が解決されることを期待します。
