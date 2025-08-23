@@ -24,8 +24,9 @@ COPY . .
 # Install Python packages for MCP communication (bypass externally-managed-environment)
 RUN pip3 install --break-system-packages requests
 
-# Make scripts executable
-RUN chmod +x /app/*.js /app/*.sh
+# Make scripts executable (if they exist)
+RUN find /app -name "*.js" -exec chmod +x {} \; || true
+RUN find /app -name "*.sh" -exec chmod +x {} \; || true
 
 # Create deployment directories
 RUN mkdir -p /var/deployment /var/log/deployment /deployment_tools
