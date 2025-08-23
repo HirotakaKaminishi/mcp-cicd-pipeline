@@ -26,7 +26,7 @@ env:
   DOCKER_PATH: /var/deployment
   
   # Application Configuration
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   DOCKER_REGISTRY: 192.168.111.200
   HEALTH_TIMEOUT: 300
 
@@ -84,33 +84,33 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: '03_sample_projects/react_apps/package-lock.json'
+          cache-dependency-path: 'mcp-cicd-pipeline/package-lock.json'
 
       - name: Install React dependencies
         run: |
-          cd 03_sample_projects/react_apps
-          npm install
+          cd mcp-cicd-pipeline
+          npm ci
 
       - name: Run React tests
         run: |
-          cd 03_sample_projects/react_apps
-          npm test -- --watchAll=false --passWithNoTests
+          cd mcp-cicd-pipeline
+          npm test -- --run
 
       - name: Lint React code
         run: |
-          cd 03_sample_projects/react_apps
+          cd mcp-cicd-pipeline
           npm run lint || echo "Linting completed with warnings"
 
       - name: Build React app
         run: |
-          cd 03_sample_projects/react_apps
+          cd mcp-cicd-pipeline
           npm run build
 
       - name: Upload React build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: react-build-artifacts
-          path: 03_sample_projects/react_apps/dist/
+          path: mcp-cicd-pipeline/dist/
           retention-days: 1
 
   test-docker-builds:
@@ -122,8 +122,8 @@ jobs:
 
       - name: Test MCP Server Docker build
         run: |
-          if [ -f "docker/mcp-server/Dockerfile" ]; then
-            docker build -f docker/mcp-server/Dockerfile docker/mcp-server/ -t test-mcp-server
+          if [ -f "mcp-cicd-pipeline/docker-enhanced/mcp-server/Dockerfile" ]; then
+            docker build -f mcp-cicd-pipeline/docker-enhanced/mcp-server/Dockerfile mcp-cicd-pipeline/docker-enhanced/mcp-server/ -t test-mcp-server
             echo "MCP Server Docker build: SUCCESS"
           else
             echo "MCP Server Dockerfile not found"
@@ -131,8 +131,8 @@ jobs:
 
       - name: Test Nginx Docker build
         run: |
-          if [ -f "docker/nginx/Dockerfile" ]; then
-            docker build -f docker/nginx/Dockerfile docker/nginx/ -t test-nginx
+          if [ -f "mcp-cicd-pipeline/docker-enhanced/nginx/Dockerfile" ]; then
+            docker build -f mcp-cicd-pipeline/docker-enhanced/nginx/Dockerfile mcp-cicd-pipeline/docker-enhanced/nginx/ -t test-nginx
             echo "Nginx Docker build: SUCCESS"
           else
             echo "Nginx Dockerfile not found"
@@ -185,7 +185,7 @@ jobs:
             "artifacts": {
               "legacy": "build/legacy-app",
               "react": "react-dist",
-              "docker": "docker/"
+              "docker": "mcp-cicd-pipeline/docker-enhanced/"
             }
           }
           EOF
@@ -197,7 +197,7 @@ jobs:
           path: |
             build/
             react-dist/
-            docker/
+            mcp-cicd-pipeline/docker-enhanced/
             scripts/
           retention-days: 7
 
@@ -291,8 +291,8 @@ jobs:
           echo "Starting SSH + Docker Compose deployment..."
           
           # Copy deployment files
-          scp -r docker/ root@${{ env.SSH_HOST }}:/root/
-          scp -r artifacts/react-dist/ root@${{ env.SSH_HOST }}:/root/03_sample_projects/react_apps/
+          scp -r mcp-cicd-pipeline/docker-enhanced/ root@${{ env.SSH_HOST }}:/var/deployment/docker/
+          scp -r artifacts/react-dist/ root@${{ env.SSH_HOST }}:/var/deployment/react-app/
           
           # Copy docker-compose.yml if exists
           if [ -f "docker-compose.yml" ]; then
