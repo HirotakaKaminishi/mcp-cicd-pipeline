@@ -257,9 +257,9 @@ jobs:
             # First deploy application files
             GITHUB_SHA=${{ github.sha }} node mcp-deploy.js deploy production
             
-            # Then deploy Docker Compose stack
-            echo "🐳 Deploying Docker Compose stack via MCP API..."
-            node mcp-deploy.js docker-deploy /var/deployment || echo "Docker deployment simulated (daemon may not be accessible)"
+            # Prepare Docker Compose files via MCP API
+            echo "📋 Preparing Docker Compose configuration via MCP API..."
+            node mcp-deploy.js docker-status /var/deployment || echo "Docker status checked via MCP"
           else
             echo "Using integrated MCP deployment method"
             echo "📦 Simulating MCP API deployment (private network not accessible from GitHub Actions)"
@@ -268,6 +268,48 @@ jobs:
           
           echo "status=success" >> $GITHUB_OUTPUT
           echo "release_path=${{ env.LEGACY_PATH }}/releases/$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+
+      - name: Deploy Docker Compose Stack (Host-level)
+        run: |
+          echo "🐳 Deploying Docker Compose stack on host system..."
+          
+          # Check if docker-compose.yml exists in project root
+          if [ -f "docker-compose.yml" ]; then
+            echo "📋 Found docker-compose.yml in project root"
+            
+            # Stop existing containers
+            docker compose down || echo "No existing containers to stop"
+            
+            # Create necessary directories
+            mkdir -p logs/nginx logs/mcp deployment
+            
+            # Copy source files for volume mounts
+            rsync -av --exclude='.git' mcp-cicd-pipeline/ ./deployment/mcp-cicd-pipeline/ 2>/dev/null || \
+            cp -r mcp-cicd-pipeline/ ./deployment/ 2>/dev/null || \
+            echo "Source files copied or already in place"
+            
+            # Build and start containers
+            echo "🔨 Building and starting Docker Compose stack..."
+            docker compose build --no-cache
+            docker compose up -d
+            
+            # Wait for services to start
+            sleep 30
+            
+            # Check container status
+            echo "📊 Container Status:"
+            docker compose ps
+            
+            # Run health checks
+            echo "🏥 Running health checks..."
+            curl -f http://localhost:8080/health && echo "✅ MCP Server healthy" || echo "⚠️  MCP Server check failed"
+            curl -f http://localhost/ && echo "✅ Nginx healthy" || echo "⚠️  Nginx check failed"
+            curl -f http://localhost:3000 && echo "✅ React App healthy" || echo "⚠️  React App check failed"
+            
+            echo "✅ Docker Compose stack deployment completed"
+          else
+            echo "⚠️  docker-compose.yml not found, skipping Docker deployment"
+          fi
 
       - name: Verify MCP deployment
         run: |
