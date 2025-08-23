@@ -9,6 +9,7 @@ services:
     volumes:
       - ./logs:/var/log/mcp
       - ./deployment:/var/deployment
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - mcp-network
     restart: always
