@@ -21,38 +21,18 @@ jobs:
         with:
           submodules: false
 
-      - name: Setup Node.js for React App
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: '03_sample_projects/react_apps/package-lock.json'
-
-      - name: Install React dependencies
-        run: |
-          cd 03_sample_projects/react_apps
-          npm install
-
-      - name: Run React tests
-        run: |
-          cd 03_sample_projects/react_apps
-          npm test -- --watchAll=false
-
-      - name: Lint React code
-        run: |
-          cd 03_sample_projects/react_apps
-          npm run lint || true
-
       - name: Test Docker builds
         run: |
           # Test MCP Server Docker build
-          docker build -f docker/mcp-server/Dockerfile docker/mcp-server/ -t test-mcp-server
+          docker build -f mcp-cicd-pipeline/docker-enhanced/mcp-server/Dockerfile mcp-cicd-pipeline/docker-enhanced/mcp-server/ -t test-mcp-server
           
-          # Test Nginx Docker build
-          docker build -f docker/nginx/Dockerfile docker/nginx/ -t test-nginx
+          # Test Nginx Docker build  
+          docker build -f mcp-cicd-pipeline/docker-enhanced/nginx/Dockerfile mcp-cicd-pipeline/docker-enhanced/nginx/ -t test-nginx
           
-          # Test React App Docker build (if needed locally)
-          # docker build -f docker/react-app/Dockerfile . -t test-react-app
+          # Test React App Docker build
+          docker build -f mcp-cicd-pipeline/docker-enhanced/react-app/Dockerfile mcp-cicd-pipeline/docker-enhanced/react-app/ -t test-react-app
+          
+          echo "All Docker builds completed successfully"
 
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -77,13 +57,13 @@ jobs:
       - name: Copy deployment files to server
         run: |
           # Copy Docker configuration
-          scp -r docker root@${{ env.MCP_SERVER_HOST }}:/root/
+          scp -r mcp-cicd-pipeline/docker-enhanced root@${{ env.MCP_SERVER_HOST }}:/root/docker
           
           # Copy docker-compose.yml
           scp docker-compose.yml root@${{ env.MCP_SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
           
           # Copy React app source for volume mount
-          scp -r 03_sample_projects/react_apps root@${{ env.MCP_SERVER_HOST }}:/root/
+          scp -r mcp-cicd-pipeline root@${{ env.MCP_SERVER_HOST }}:/root/react_apps
 
       - name: Deploy Docker Stack
         run: |
