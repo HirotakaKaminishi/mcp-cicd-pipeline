@@ -48,14 +48,11 @@ services:
 
   react-app:
     build:
-      context: ./docker/react-app
-      dockerfile: Dockerfile
+      context: ./03_sample_projects/react_apps
+      dockerfile: ../../docker/react-app/Dockerfile
     container_name: react-app
     ports:
       - "3000:3000"
-    volumes:
-      - ./03_sample_projects/react_apps:/app
-      - node_modules:/app/node_modules
     networks:
       - mcp-network
     restart: always
@@ -64,6 +61,11 @@ services:
       - VITE_MCP_SERVER_URL=http://mcp-server:8080
     depends_on:
       - mcp-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   deployment-manager:
     build:
@@ -81,6 +83,11 @@ services:
       - mcp-server
     environment:
       - MCP_SERVER_URL=http://mcp-server:8080
+    healthcheck:
+      test: ["CMD", "ps", "aux"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   mcp-network:
@@ -91,7 +98,7 @@ networks:
           gateway: 172.20.0.1
 
 volumes:
-  node_modules:
+  react_app_node_modules:
     driver: local
   nginx_logs:
     driver: local
