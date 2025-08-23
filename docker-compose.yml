@@ -8,12 +8,13 @@ services:
       dockerfile: Dockerfile
     container_name: react-nginx-app
     ports:
-      - "80:80"
+      - "8090:80"  # Changed to avoid port 80 conflict
     environment:
       - NODE_ENV=production
-      - REACT_APP_MCP_SERVER_URL=http://192.168.111.200:8080
+      - REACT_APP_MCP_SERVER_URL=http://192.168.111.200:8081
     depends_on:
-      - mcp-server
+      mcp-server:
+        condition: service_healthy
     networks:
       - mcp-network
     restart: unless-stopped
@@ -24,6 +25,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
   # MCP Server API
   mcp-server:
@@ -32,7 +34,7 @@ services:
       dockerfile: Dockerfile
     container_name: mcp-api-server
     ports:
-      - "8080:8080"
+      - "8081:8080"  # Changed to avoid port 8080 conflict
     environment:
       - PYTHONUNBUFFERED=1
       - FLASK_ENV=production
