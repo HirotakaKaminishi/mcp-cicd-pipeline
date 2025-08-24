@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+  // eslint-disable-next-line no-undef
   const env = loadEnv(mode, process.cwd(), '')
   
   return {
@@ -24,11 +25,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/api\/mcp/, ''),
-          configure: (proxy, options) => {
-            proxy.on('error', (err, req, res) => {
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
               console.log('Proxy error:', err);
             });
-            proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxy.on('proxyReq', (proxyReq) => {
               proxyReq.setHeader('Content-Type', 'application/json');
             });
           }
@@ -67,6 +68,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       // Global environment variables available in the app
+      // eslint-disable-next-line no-undef
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
       __BUILD_TIME__: JSON.stringify(new Date().toISOString())
     }
