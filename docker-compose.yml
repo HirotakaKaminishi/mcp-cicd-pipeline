@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: mcp-server
     ports:
-      - "8080:8080"
+      - "${MCP_SERVER_PORT:-8080}:${MCP_SERVER_PORT:-8080}"
     volumes:
       - ./logs:/var/log/mcp
       - ./deployment:/var/deployment
@@ -13,14 +13,41 @@ services:
     networks:
       - mcp-network
     restart: always
+    # Security enhancements
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - DAC_OVERRIDE  # For Docker socket access
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=mcp-server,environment=production"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:${MCP_SERVER_PORT:-8080}"]
+      interval: 15s
+      timeout: 5s
       retries: 3
+      start_period: 30s
     environment:
-      - MCP_SERVER_PORT=8080
-      - NODE_ENV=production
+      - MCP_SERVER_PORT=${MCP_SERVER_PORT:-8080}
+      - NODE_ENV=${NODE_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
 
   nginx:
     build:
@@ -28,8 +55,8 @@ services:
       dockerfile: Dockerfile
     container_name: nginx-proxy
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/conf:/etc/nginx/conf.d
       - ./nginx/html:/usr/share/nginx/html
@@ -37,13 +64,46 @@ services:
     networks:
       - mcp-network
     restart: always
+    # Security enhancements
+    user: "101:101"  # nginx user
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETGID
+      - SETUID
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=nginx,environment=production"
     depends_on:
-      - mcp-server
+      mcp-server:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
       retries: 3
+      start_period: 30s
+    environment:
+      - NGINX_WORKER_PROCESSES=${NGINX_WORKER_PROCESSES:-auto}
+      - NGINX_WORKER_CONNECTIONS=${NGINX_WORKER_CONNECTIONS:-1024}
 
   react-app:
     build:
@@ -51,18 +111,55 @@ services:
       dockerfile: ./docker-enhanced/react-app/Dockerfile
     container_name: react-app
     ports:
-      - "3000:3000"
+      - "${REACT_PORT:-3000}:${VITE_PORT:-3000}"
     volumes:
       - ./mcp-cicd-pipeline:/app
       - node_modules:/app/node_modules
+      - /app/node_modules  # Prevent node_modules from being overwritten
     networks:
       - mcp-network
     restart: always
+    # Security enhancements
+    user: "1001:1001"  # non-root user
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=react-app,environment=development"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${VITE_PORT:-3000}/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     environment:
-      - NODE_ENV=development
-      - VITE_MCP_SERVER_URL=http://mcp-server:8080
+      - NODE_ENV=${NODE_ENV:-development}
+      - VITE_PORT=${VITE_PORT:-3000}
+      - VITE_HOST=${VITE_HOST:-0.0.0.0}
+      - VITE_MCP_SERVER_URL=${VITE_MCP_SERVER_URL:-http://mcp-server:8080}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://192.168.111.200/api/mcp}
+      - VITE_HMR_PORT=${VITE_HMR_PORT:-24678}
     depends_on:
-      - mcp-server
+      mcp-server:
+        condition: service_healthy
 
   deployment-manager:
     build:
@@ -76,10 +173,43 @@ services:
     networks:
       - mcp-network
     restart: always
+    # Security enhancements
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE  # For Docker socket access
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+        labels: "service=deployment-manager,environment=production"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://mcp-server:8080', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     depends_on:
-      - mcp-server
+      mcp-server:
+        condition: service_healthy
     environment:
-      - MCP_SERVER_URL=http://mcp-server:8080
+      - MCP_SERVER_URL=http://mcp-server:${MCP_SERVER_PORT:-8080}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
 
 networks:
   mcp-network:
