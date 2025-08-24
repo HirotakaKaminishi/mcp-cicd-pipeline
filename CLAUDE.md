@@ -226,6 +226,170 @@ curl http://192.168.111.200/app/
 curl http://192.168.111.200/api/mcp/
 ```
 
+## 🔧 Comprehensive Troubleshooting Guide (Operational Experience)
+
+### 🚨 Major Issues Encountered and Solutions
+
+#### 1. MCP Server BrokenPipeError Issues
+**Problem**: `BrokenPipeError: [Errno 32] Broken pipe` during HTTP response writing
+**Root Cause**: Single-threaded HTTP server unable to handle concurrent connections properly
+**Solution Implemented**:
+```python
+# Enhanced with ThreadedTCPServer in mcp_server_extended.py
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+    timeout = 30
+    
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        super().server_bind()
+```
+**Verification**: MCP API endpoints now return HTTP 200 consistently
+
+#### 2. Docker Container Permission Problems
+**Problem**: Nginx container permission denied errors
+```
+[emerg] 1#1: mkdir() "/var/cache/nginx/client_temp" failed (13: Permission denied)
+```
+**Root Cause**: Restrictive user/security settings in docker-compose.yml
+**Solution Implemented**:
+- Removed complex `cap_drop/cap_add` configurations
+- Modified nginx.conf to use stderr logging: `error_log stderr warn;`
+- Used `/tmp/nginx.pid` for PID file in non-root mode
+- Simplified security settings to `security_opt: [no-new-privileges:true]`
+
+#### 3. Git Submodule Issues in GitHub Actions
+**Problem**: `no submodule mapping found in .gitmodules for path`
+**Root Cause**: Embedded repositories causing submodule conflicts
+**Solution Implemented**:
+```bash
+# Conditional submodule check in GitHub Actions
+if [ -f .gitmodules ] && [ -s .gitmodules ]; then
+  echo "Found .gitmodules, deinitializing submodules..."
+  git submodule deinit --all --force || true
+else
+  echo "No .gitmodules file found, skipping submodule deinit"
+fi
+```
+
+#### 4. ESLint Errors in React CI/CD Pipeline
+**Problem**: 7 ESLint errors in vite.config.js including 'process is not defined'
+**Solution Implemented**:
+- Added `/* eslint-disable-next-line no-undef */` for Node.js process global access
+- Removed unused parameters from proxy event handlers
+- Maintained functionality while achieving ESLint compliance
+
+#### 5. Docker Network Connectivity Issues
+**Problem**: Containers unable to communicate across different networks
+**Solution**: Connected all containers to the same network using:
+```bash
+docker network connect mcp-network mcp-server
+```
+
+### 🔍 Operational Monitoring Procedures
+
+#### Container Health Monitoring
+```bash
+# Check all container status
+docker-compose ps
+
+# Monitor container resource usage
+docker stats --no-stream
+
+# Check container logs for specific service
+docker-compose logs -f [service_name]
+
+# Inspect network connectivity
+docker network inspect mcp-network
+```
+
+#### Endpoint Health Verification
+```bash
+# All endpoints should return HTTP 200
+curl -f http://192.168.111.200/           # Main site
+curl -f http://192.168.111.200/health     # Health check
+curl -f http://192.168.111.200/service    # Service status  
+curl -f http://192.168.111.200/api/mcp/   # MCP API
+curl -f http://192.168.111.200:8080       # Direct MCP Server
+```
+
+#### MCP Server Stability Check
+```bash
+# Test MCP Server threading stability
+curl -X POST http://192.168.111.200:8080 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"get_system_info","params":{},"id":1}'
+```
+
+### 📊 Container Resource Management
+
+#### Resource Usage Monitoring
+- **MCP Server Container**: Typically ~50MB RAM, minimal CPU
+- **Nginx Proxy Container**: ~10MB RAM, low CPU usage
+- **React App Container**: ~100MB RAM during build, ~20MB in production
+- **Deployment Manager**: Ephemeral, used only during deployments
+
+#### Storage Management
+```bash
+# Check Docker disk usage
+docker system df
+
+# Clean unused containers/images
+docker system prune
+
+# Check container filesystem usage
+docker-compose exec [service] df -h
+```
+
+### 🔄 GitHub Actions Workflow Debugging
+
+#### Common Workflow Issues and Solutions
+1. **Git Exit Code 128 Warnings**: Resolved with conditional submodule checks
+2. **Docker Build Failures**: Check Dockerfile permissions and base image availability  
+3. **Container Startup Failures**: Verify port conflicts and network configuration
+4. **SSH Key Issues**: Ensure MCP_DOCKER_SSH_KEY secret is properly configured
+
+#### Workflow Monitoring Commands
+```bash
+# Monitor workflow execution
+gh run list --repo HirotakaKaminishi/mcp-cicd-pipeline
+
+# Check specific workflow run
+gh run view [run_id] --log
+
+# Re-run failed workflow
+gh run rerun [run_id]
+```
+
+### 🛠️ Container Recovery Procedures
+
+#### Service Recovery Steps
+1. **Container Restart**: `docker-compose restart [service_name]`
+2. **Full Stack Restart**: `docker-compose down && docker-compose up -d`
+3. **Network Reset**: `docker network prune && docker-compose up -d`
+4. **Volume Reset**: `docker-compose down -v && docker-compose up -d`
+
+#### Emergency SSH Access
+When MCP Server is unreachable, use SSH fallback:
+```bash
+ssh -i "C:\Users\hirotaka\Documents\work\auth_organized\keys_configs\mcp_docker_key" root@192.168.111.200 "cd /var/deployment && docker-compose logs"
+```
+
+### ⚡ Performance Optimization
+
+#### Container Optimization
+- Use `--no-cache` only when necessary during builds
+- Implement proper health checks to prevent cascade failures
+- Monitor container memory usage and adjust limits if needed
+- Use multi-stage builds to minimize image sizes
+
+#### Network Optimization
+- Ensure all containers are on the same Docker network
+- Use internal container names for inter-container communication
+- Implement proper timeout values for health checks
+
 ## Important Notes (Docker Environment)
 - **All services run in isolated containers**
 - **No direct host OS editing - everything containerized**
