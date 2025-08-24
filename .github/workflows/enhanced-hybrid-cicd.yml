@@ -277,8 +277,13 @@ jobs:
           if [ -f "docker-compose.yml" ]; then
             echo "📋 Found docker-compose.yml in project root"
             
-            # Stop existing containers
-            docker compose down || echo "No existing containers to stop"
+            # Stop and remove existing containers by name
+            echo "🛑 Removing existing containers to prevent name conflicts..."
+            docker stop mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
+            docker rm mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
+            
+            # Stop existing containers with compose
+            docker compose down --remove-orphans || echo "No existing containers to stop"
             
             # Create necessary directories
             mkdir -p logs/nginx logs/mcp deployment
@@ -291,7 +296,7 @@ jobs:
             # Build and start containers
             echo "🔨 Building and starting Docker Compose stack..."
             docker compose build --no-cache
-            docker compose up -d
+            docker compose up -d --force-recreate --remove-orphans
             
             # Wait for services to start
             sleep 30
@@ -364,12 +369,17 @@ jobs:
           ssh root@${{ env.SSH_HOST }} << 'EOF'
             cd ${{ env.DOCKER_PATH }}
             
+            # Stop and remove existing containers by name
+            echo "🛑 Removing existing containers to prevent name conflicts..."
+            docker stop mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
+            docker rm mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
+            
             # Stop existing containers gracefully
-            docker compose down || true
+            docker compose down --remove-orphans || true
             
             # Build and start containers
             docker compose build --no-cache
-            docker compose up -d
+            docker compose up -d --force-recreate --remove-orphans
             
             # Wait for services to be ready
             sleep 30
