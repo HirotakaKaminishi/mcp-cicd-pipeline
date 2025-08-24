@@ -10,14 +10,16 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY default.conf /etc/nginx/conf.d/default.conf
 
-# Create directories for logs and content
-RUN mkdir -p /var/log/nginx /usr/share/nginx/html
+# Create directories with proper permissions
+RUN mkdir -p /var/log/nginx /usr/share/nginx/html /var/cache/nginx /tmp \
+    && chmod -R 755 /var/log/nginx /usr/share/nginx/html /var/cache/nginx /tmp \
+    && chown -R nginx:nginx /var/log/nginx /usr/share/nginx/html /var/cache/nginx /tmp
 
 # Copy static content
 COPY html/ /usr/share/nginx/html/
 
-# Set proper permissions
-RUN chown -R nginx:nginx /var/log/nginx /usr/share/nginx/html
+# Ensure writable permissions for nginx user
+RUN chown -R nginx:nginx /usr/share/nginx/html
 
 # Expose ports
 EXPOSE 80 443

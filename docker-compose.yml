@@ -64,19 +64,10 @@ services:
     networks:
       - mcp-network
     restart: always
-    # Security enhancements
-    user: "101:101"  # nginx user
+    # Simplified security settings for compatibility
     security_opt:
       - no-new-privileges:true
-      - apparmor:docker-default
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-      - CHOWN
-      - SETGID
-      - SETUID
-    # Resource limits
+    # Basic resource limits
     deploy:
       resources:
         limits:
