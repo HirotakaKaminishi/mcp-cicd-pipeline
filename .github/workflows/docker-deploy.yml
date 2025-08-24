@@ -50,7 +50,13 @@ jobs:
       - name: Clean Git state for self-hosted runner
         run: |
           echo "Cleaning Git state to prevent submodule warnings..."
-          git submodule deinit --all --force || true
+          # Check if .gitmodules exists before running submodule commands
+          if [ -f .gitmodules ] && [ -s .gitmodules ]; then
+            echo "Found .gitmodules, deinitializing submodules..."
+            git submodule deinit --all --force || true
+          else
+            echo "No .gitmodules file found, skipping submodule deinit"
+          fi
           git clean -fdx || true
           git reset --hard HEAD || true
           echo "Git state cleaned successfully"
