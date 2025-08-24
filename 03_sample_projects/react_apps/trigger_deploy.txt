@@ -1,0 +1,1 @@
+Trigger MCP configuration deployment
