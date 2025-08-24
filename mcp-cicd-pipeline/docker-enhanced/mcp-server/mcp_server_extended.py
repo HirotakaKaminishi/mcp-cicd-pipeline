@@ -14,6 +14,7 @@ import threading
 import time
 import logging
 import shutil
+import socket
 from pathlib import Path
 
 # Setup logging
@@ -28,10 +29,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class MCPHandler(http.server.BaseHTTPRequestHandler):
+    timeout = 60  # Set request timeout to 60 seconds
+    
     def log_message(self, format, *args):
         logger.info("%s - - [%s] %s" % (self.client_address[0], 
                                        self.log_date_time_string(), 
                                        format % args))
+    
+    def _safe_write_response(self, response_data):
+        """Safely write response data with BrokenPipeError handling"""
+        try:
+            self.wfile.write(response_data.encode('utf-8'))
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as e:
+            logger.warning(f"Client connection lost during response: {e}")
+        except Exception as e:
+            logger.error(f"Error writing response: {e}")
 
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
@@ -162,7 +175,7 @@ class MCPHandler(http.server.BaseHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', 'Content-Type')
             self.end_headers()
-            self.wfile.write(json.dumps(response).encode('utf-8'))
+            self._safe_write_response(json.dumps(response))
 
         except Exception as e:
             logger.error(f"Error processing request: {str(e)}")
@@ -177,7 +190,7 @@ class MCPHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(500)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps(error_response).encode('utf-8'))
+            self._safe_write_response(json.dumps(error_response))
 
     def do_GET(self):
         if self.path == '/':
@@ -189,7 +202,7 @@ class MCPHandler(http.server.BaseHTTPRequestHandler):
                 'version': '2.0',
                 'timestamp': time.time()
             }
-            self.wfile.write(json.dumps(health_info).encode('utf-8'))
+            self._safe_write_response(json.dumps(health_info))
         else:
             self.send_error(404)
 
@@ -215,9 +228,18 @@ def main():
     os.makedirs('/var/log/mcp', exist_ok=True)
     os.makedirs('/var/deployment', exist_ok=True)
     
-    with socketserver.TCPServer(("", PORT), MCPHandler) as httpd:
-        httpd.allow_reuse_address = True
-        logger.info(f'MCP Server Extended running on port {PORT}')
+    class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+        allow_reuse_address = True
+        daemon_threads = True  # Ensure threads die when main thread dies
+        timeout = 30  # Set socket timeout
+        
+        def server_bind(self):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            super().server_bind()
+
+    with ThreadedTCPServer(("", PORT), MCPHandler) as httpd:
+        logger.info(f'MCP Server Extended running on port {PORT} (Multi-threaded)')
         logger.info('Available methods: get_system_info, list_directory, execute_command, read_file, write_file, manage_service, deploy_application, health_check')
         
         try:
