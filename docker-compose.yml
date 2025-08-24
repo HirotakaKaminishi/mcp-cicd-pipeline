@@ -185,6 +185,62 @@ services:
       - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-production}
       - LOG_LEVEL=${LOG_LEVEL:-info}
 
+  # Vibe-Kanban - Complete Dockerized AI Agent Orchestration
+  vibe-kanban:
+    build:
+      context: ./vibe-kanban-docker
+      dockerfile: Dockerfile
+    container_name: vibe-kanban
+    ports:
+      - "${VIBE_KANBAN_PORT:-3001}:3000"  # Expose on 3001 locally, runs on 3000 internally
+    volumes:
+      - vibe_kanban_data:/app/data
+      - vibe_kanban_config:/app/.config
+      - ./logs/vibe-kanban:/app/logs
+    networks:
+      - mcp-network
+    restart: always
+    # Security enhancements
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits (based on operational requirements)
+    deploy:
+      resources:
+        limits:
+          memory: 1024M  # Increased for vibe-kanban runtime
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        labels: "service=vibe-kanban,environment=production,type=ai-orchestration"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - HOST=0.0.0.0
+      - PUBLIC_URL=http://192.168.111.200:3001
+      - MCP_SERVER_URL=http://mcp-server:${MCP_SERVER_PORT:-8080}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_OWNER=HirotakaKaminishi
+      - GITHUB_REPO=mcp-cicd-pipeline
+      - AI_AGENT_CONCURRENCY_LIMIT=${AI_AGENT_CONCURRENCY_LIMIT:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DISABLE_BROWSER_OPEN=true  # Prevent browser opening in container
+
 networks:
   mcp-network:
     driver: bridge
@@ -199,4 +255,8 @@ volumes:
   nginx_logs:
     driver: local
   mcp_logs:
+    driver: local
+  vibe_kanban_data:
+    driver: local
+  vibe_kanban_config:
     driver: local
