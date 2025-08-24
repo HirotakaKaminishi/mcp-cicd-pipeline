@@ -1,0 +1,474 @@
+name: MCP Server CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - demo
+
+env:
+  MCP_SERVER_URL: ${{ secrets.MCP_SERVER_URL || 'http://192.168.111.200:8080' }}
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/root/mcp_project' }}
+  NODE_VERSION: '18'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: 🧪 Run Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: false
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    name: 🔨 Build Application
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 30
+
+  deploy:
+    # Use self-hosted runner for main branch, ubuntu-latest for others (demo mode)
+    runs-on: ${{ github.ref == 'refs/heads/main' && 'self-hosted' || 'ubuntu-latest' }}
+    needs: build
+    name: 🚀 Deploy to MCP Server
+    if: github.event_name != 'pull_request'
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'demo' }}
+      url: ${{ env.MCP_SERVER_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+
+      # Production deployment (main branch with self-hosted runner)
+      - name: Verify MCP Server connectivity
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "🔍 Testing MCP server connectivity..."
+          response=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"get_system_info","params":{},"id":1}' \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --fail \
+            --silent) || {
+            echo "❌ Cannot connect to MCP server at $MCP_SERVER_URL"
+            exit 1
+          }
+          
+          echo "✅ MCP server connected successfully"
+          echo "📊 Server info: $(echo $response | jq -r '.result.system // "N/A"')"
+
+      - name: Deploy to MCP Server (Production)
+        if: github.ref == 'refs/heads/main'
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          echo "🚀 Starting production deployment to MCP Server"
+          echo "📦 Repository: ${{ github.repository }}"
+          echo "🔄 Commit: ${{ github.sha }}"
+          echo "🏃 Run: #${{ github.run_number }}"
+          
+          # Create timestamped release directory
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          RELEASE_DIR="$DEPLOY_PATH/releases/$TIMESTAMP"
+          
+          echo "📁 Creating release directory: $RELEASE_DIR"
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mkdir -p $RELEASE_DIR\"},\"id\":1}"
+          
+          # Deploy application files using execute_command with base64 encoding
+          echo "📂 Deploying application files via execute_command..."
+          echo "🔍 DEBUG: Contents of dist/ directory:"
+          ls -la dist/
+          
+          for file in dist/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "📝 Deploying: $filename"
+              echo "🔍 DEBUG: File size: $(wc -c < "$file") bytes"
+              
+              # Encode file content as base64 to avoid shell escaping issues
+              encoded_content=$(base64 -w 0 "$file")
+              echo "🔍 DEBUG: Base64 encoded (first 50 chars): ${encoded_content:0:50}..."
+              
+              # Deploy via MCP API using execute_command with base64 decoding
+              response=$(curl -X POST "$MCP_SERVER_URL" \
+                -H "Content-Type: application/json" \
+                -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_content' | base64 -d > $RELEASE_DIR/$filename\"},\"id\":1}" \
+                --silent --show-error)
+              
+              echo "🔍 DEBUG: MCP API Response: $response"
+              
+              # Check if response contains error or command failed
+              if echo "$response" | grep -q '"error"' || echo "$response" | grep -q '"returncode":[^0]'; then
+                echo "❌ ERROR: Failed to deploy $filename"
+                echo "$response"
+              else
+                echo "✅ SUCCESS: $filename deployed"
+                
+                # Verify file was written correctly
+                verify_response=$(curl -X POST "$MCP_SERVER_URL" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"ls -la $RELEASE_DIR/$filename && echo 'File size:' && wc -c < $RELEASE_DIR/$filename\"},\"id\":1}" \
+                  --silent)
+                
+                echo "🔍 VERIFY: File verification: $(echo "$verify_response" | grep -o '"stdout":"[^"]*"' | cut -d'"' -f4)"
+              fi
+            fi
+          done
+          
+          # Create deployment metadata using execute_command
+          echo "📋 Creating deployment metadata..."
+          metadata_content="{
+            \"commit_sha\": \"$GITHUB_SHA\",
+            \"repository\": \"${{ github.repository }}\",
+            \"run_number\": $GITHUB_RUN_NUMBER,
+            \"deployed_at\": \"$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)\",
+            \"deployed_by\": \"GitHub Actions\",
+            \"branch\": \"${{ github.ref_name }}\",
+            \"environment\": \"production\"
+          }"
+          
+          # Encode metadata as base64
+          encoded_metadata=$(echo "$metadata_content" | base64 -w 0)
+          
+          # Deploy metadata file
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$encoded_metadata' | base64 -d > $RELEASE_DIR/deployment.json\"},\"id\":1}"
+          
+          # Copy files to container build directory
+          echo "🔗 Preparing container deployment..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mkdir -p /root/mcp_containers/app/src && cp -r $RELEASE_DIR/* /root/mcp_containers/app/src/\"},\"id\":1}"
+          
+          # Deploy cleanup scripts (first time or updates)
+          echo "🧹 Deploying cleanup automation scripts..."
+          
+          # Deploy cleanup.sh script
+          cleanup_script_content=$(base64 -w 0 scripts/cleanup.sh)
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"mkdir -p /root/mcp_scripts && echo '$cleanup_script_content' | base64 -d > /root/mcp_scripts/cleanup.sh && chmod +x /root/mcp_scripts/cleanup.sh\"},\"id\":1}"
+          
+          # Deploy installation script
+          install_script_content=$(base64 -w 0 scripts/install-cleanup-cron.sh)
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$install_script_content' | base64 -d > /tmp/install-cleanup-cron.sh && chmod +x /tmp/install-cleanup-cron.sh\"},\"id\":1}"
+          
+          # Install cron job (only if not already installed)
+          echo "⏰ Setting up automated cleanup schedule..."
+          cron_setup=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"if ! crontab -l 2>/dev/null | grep -q '/root/mcp_scripts/cleanup.sh'; then echo '0 2 * * * /root/mcp_scripts/cleanup.sh >/dev/null 2>&1' | crontab -; echo 'Cron job installed'; else echo 'Cron job already exists'; fi\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 CRON SETUP: $cron_setup"
+          
+          # Build new container image
+          echo "🏗️ Building container image..."
+          build_response=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"cd /root/mcp_containers && docker build -t mcp-app:$TIMESTAMP ./app\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 CONTAINER BUILD: Build response: $build_response"
+          
+          # Automated Zero-Downtime Container Replacement
+          echo "🔄 Starting automated zero-downtime container replacement..."
+          
+          # Step 1: Start new container with temporary name
+          echo "🚀 Step 1: Starting new container (temporary name)..."
+          start_new=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker run -d --name mcp-app-new --network mcp-network --hostname app-new -e NODE_ENV=production -e PORT=3000 mcp-app:$TIMESTAMP\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 NEW CONTAINER: Start response: $start_new"
+          
+          # Step 2: Wait for new container to be healthy
+          echo "⏳ Step 2: Waiting for new container to be healthy..."
+          for i in {1..15}; do
+            sleep 2
+            health_check=$(curl -X POST "$MCP_SERVER_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker exec mcp-app-new curl -s http://localhost:3000/health --connect-timeout 5\"},\"id\":1}" \
+              --silent)
+            
+            if echo "$health_check" | grep -q '"status":"healthy"'; then
+              echo "✅ SUCCESS: New container is healthy and ready"
+              break
+            else
+              echo "⏳ Health check attempt $i/15..."
+            fi
+          done
+          
+          # Step 3: Stop old container (graceful shutdown)
+          echo "🛑 Step 3: Gracefully stopping old container..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker stop mcp-app 2>/dev/null || echo 'No old container to stop'\"},\"id\":1}"
+          
+          # Step 4: Remove old container
+          echo "🗑️ Step 4: Removing old container..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker rm mcp-app 2>/dev/null || echo 'No old container to remove'\"},\"id\":1}"
+          
+          # Step 5: Rename new container to production name
+          echo "🔄 Step 5: Promoting new container to production..."
+          rename_response=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker rename mcp-app-new mcp-app\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 RENAME: Container rename response: $rename_response"
+          
+          # Step 6: Update container hostname for Nginx
+          echo "🌐 Step 6: Updating container network configuration..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker network disconnect mcp-network mcp-app && docker network connect mcp-network mcp-app --alias app\"},\"id\":1}"
+          
+          # Step 7: Verify final deployment
+          echo "✅ Step 7: Final deployment verification..."
+          final_check=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker ps | grep mcp-app\"},\"id\":1}" \
+            --silent)
+          
+          if echo "$final_check" | grep -q '"stdout":".*mcp-app.*Up"'; then
+            echo "🎉 SUCCESS: Zero-downtime container replacement completed!"
+          else
+            echo "⚠️  WARNING: Container replacement may need verification"
+          fi
+          
+          # Test application endpoint through Nginx
+          echo "🏥 Testing application through Nginx proxy..."
+          app_test=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"curl -s http://localhost/ --connect-timeout 10\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 NGINX TEST: Application test via Nginx: $app_test"
+          
+          # Automated Cleanup: Remove old Docker images (keep latest 3)
+          echo "🧹 Step 8: Cleaning up old Docker images..."
+          cleanup_images=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker images mcp-app --format '{{.Tag}}' | grep -E '^[0-9]{8}_[0-9]{6}$' | sort -r | tail -n +4 | xargs -r -I {} docker rmi mcp-app:{} 2>/dev/null || echo 'No old images to remove'\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 CLEANUP IMAGES: $cleanup_images"
+          
+          # Automated Cleanup: Remove dangling images
+          echo "🧹 Cleaning up dangling Docker images..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"docker image prune -f\"},\"id\":1}"
+          
+          # Automated Cleanup: Remove old release directories (keep latest 5)
+          echo "🧹 Step 9: Cleaning up old release directories..."
+          cleanup_releases=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"cd $DEPLOY_PATH/releases && ls -1t | tail -n +6 | xargs -r rm -rf && echo 'Cleanup completed. Remaining releases:' && ls -1t | wc -l\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 CLEANUP RELEASES: $cleanup_releases"
+          
+          # Log rotation: Keep only last 100 log entries
+          echo "🧹 Step 10: Rotating deployment logs..."
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"tail -n 100 $DEPLOY_PATH/deployment.log > $DEPLOY_PATH/deployment.log.tmp && mv $DEPLOY_PATH/deployment.log.tmp $DEPLOY_PATH/deployment.log || touch $DEPLOY_PATH/deployment.log\"},\"id\":1}"
+          
+          # Log successful deployment
+          log_entry="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ): Production deployment successful - $GITHUB_SHA (GitHub Actions #$GITHUB_RUN_NUMBER) | Image: mcp-app:$TIMESTAMP"
+          curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo '$log_entry' >> $DEPLOY_PATH/deployment.log\"},\"id\":1}"
+          
+          # Display cleanup summary
+          echo "📊 Cleanup Summary:"
+          cleanup_summary=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"echo 'Docker Images:' && docker images mcp-app --format 'table {{.Tag}}\t{{.Size}}\t{{.CreatedAt}}' | head -5 && echo '' && echo 'Release Directories:' && ls -1t $DEPLOY_PATH/releases | head -5 && echo '...' && echo 'Total: '$(ls -1 $DEPLOY_PATH/releases | wc -l)' directories'\"},\"id\":1}" \
+            --silent)
+          
+          echo "🔍 CLEANUP SUMMARY: $(echo \"$cleanup_summary\" | grep -o '\"stdout\":\"[^\"]*\"' | cut -d'\"' -f4 | sed 's/\\\\n/\\n/g')"
+          
+          echo "🎉 Container-based production deployment completed successfully!"
+          echo "📊 Container image: mcp-app:$TIMESTAMP"
+          echo "🐳 Container name: mcp-app"
+          echo "🌐 Environment: production (containerized)"
+          echo "♻️ Cleanup: Automated rotation applied"
+
+      # Demo deployment (develop branch or manual trigger)
+      - name: Deploy to MCP Server (Demo Mode)
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "🚀 Starting CI/CD Pipeline Demo Deployment"
+          echo "📦 Commit: ${{ github.sha }}"
+          echo "🎯 Target: MCP Server (Demo Mode)"
+          echo "🌿 Branch: ${{ github.ref_name }}"
+          echo ""
+          echo "✅ Test Stage: Completed successfully"
+          echo "✅ Build Stage: Completed successfully" 
+          echo "🚀 Deploy Stage: Simulating MCP server deployment..."
+          echo ""
+          echo "📋 Deployment Summary:"
+          echo "  - Repository: ${{ github.repository }}"
+          echo "  - Branch: ${{ github.ref_name }}"
+          echo "  - Commit SHA: ${{ github.sha }}"
+          echo "  - Workflow: ${{ github.workflow }}"
+          echo "  - Run Number: ${{ github.run_number }}"
+          echo ""
+          echo "🎉 Demo deployment completed successfully!"
+          echo "💡 Note: This is a simulation. Main branch deploys to actual MCP server."
+
+      # Post-deployment verification (production only)
+      - name: Run post-deployment tests
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "🧪 Running post-deployment verification..."
+          
+          # Verify deployment directory structure
+          response=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"execute_command\",\"params\":{\"command\":\"ls -la $DEPLOY_PATH/\"},\"id\":1}" \
+            --silent)
+          
+          if echo "$response" | grep -q "current"; then
+            echo "✅ Deployment structure verified"
+          else
+            echo "❌ Deployment verification failed"
+            exit 1
+          fi
+          
+          # Test containerized application health check
+          echo "🏥 Container health check after deployment..."
+          for attempt in {1..5}; do
+            health_response=$(curl -X POST "$MCP_SERVER_URL" \
+              -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","method":"execute_command","params":{"command":"curl -s -w \"HTTP_CODE:%{http_code}\" http://localhost:3000/health --connect-timeout 5"},"id":1}' \
+              --silent)
+            
+            if echo "$health_response" | grep -q "200"; then
+              echo "✅ SUCCESS: Container health check passed (attempt $attempt/5)"
+              echo "🔍 HEALTH RESPONSE: $(echo "$health_response" | grep -o '"stdout":"[^"]*"' | cut -d'"' -f4)"
+              break
+            else
+              echo "⏳ Health check attempt $attempt/5 failed, retrying..."
+              sleep 3
+            fi
+          done
+          
+          # Verify container is running
+          container_verify=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"execute_command","params":{"command":"docker ps | grep mcp-app-test | grep Up | wc -l"},"id":1}' \
+            --silent)
+          
+          echo "🔍 CONTAINER VERIFY: Running container count: $(echo "$container_verify" | grep -o '"stdout":"[^"]*"' | cut -d'"' -f4)"
+          
+          # Show container logs for debugging
+          container_logs=$(curl -X POST "$MCP_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"execute_command","params":{"command":"docker logs mcp-app-test --tail 5"},"id":1}' \
+            --silent)
+          
+          echo "🔍 CONTAINER LOGS: Latest container logs: $(echo "$container_logs" | grep -o '"stdout":"[^"]*"' | cut -d'"' -f4)"
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test, build, deploy]
+    name: 📢 Deployment Notifications
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          # Set deployment type
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            DEPLOY_TYPE="Production"
+            DEPLOY_TARGET="MCP Server (Containerized)"
+          else
+            DEPLOY_TYPE="Demo"
+            DEPLOY_TARGET="Simulation Mode"
+          fi
+          
+          echo "## 🚀 $DEPLOY_TYPE Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy Type:** $DEPLOY_TYPE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target:** $DEPLOY_TARGET" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ needs.deploy.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "🎉 $DEPLOY_TYPE deployment completed successfully!"
+          else
+            echo "❌ $DEPLOY_TYPE deployment failed. Check logs for details."
+            exit 1
+          fi

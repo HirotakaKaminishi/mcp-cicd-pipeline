@@ -1,0 +1,27 @@
+{
+  "name": "mcp-sample-app",
+  "version": "1.0.0",
+  "description": "Sample application for MCP CI/CD pipeline",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "build": "npm run clean && mkdir -p dist && cp -r src/* dist/ && cp package.json dist/",
+    "test": "jest --forceExit",
+    "lint": "eslint src/**/*.js",
+    "clean": "rm -rf dist",
+    "deploy": "node deploy-local.js deploy mcp-sample-app",
+    "deploy:demo": "node deploy-local.js demo",
+    "deploy:test": "node deploy-local.js test"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.57.0",
+    "supertest": "^6.3.3"
+  },
+  "keywords": ["mcp", "cicd", "sample"],
+  "author": "MCP CI/CD Demo",
+  "license": "MIT"
+}
