@@ -306,8 +306,8 @@ jobs:
             
             # Stop and remove existing containers by name
             echo "🛑 Removing existing containers to prevent name conflicts..."
-            docker stop mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
-            docker rm mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
+            docker stop mcp-server nginx-proxy react-app deployment-manager vibe-kanban vibe-kanban-fixed 2>/dev/null || true
+            docker rm mcp-server nginx-proxy react-app deployment-manager vibe-kanban vibe-kanban-fixed 2>/dev/null || true
             
             # Stop existing containers with compose
             docker compose down --remove-orphans || echo "No existing containers to stop"
@@ -337,6 +337,7 @@ jobs:
             curl -f http://localhost:8080/health && echo "✅ MCP Server healthy" || echo "⚠️  MCP Server check failed"
             curl -f http://localhost/ && echo "✅ Nginx healthy" || echo "⚠️  Nginx check failed"
             curl -f http://localhost:3000 && echo "✅ React App healthy" || echo "⚠️  React App check failed"
+            curl -f http://localhost:3001 && echo "✅ Vibe-Kanban healthy" || echo "⚠️  Vibe-Kanban check failed"
             
             echo "✅ Docker Compose stack deployment completed"
           else
@@ -398,8 +399,8 @@ jobs:
             
             # Stop and remove existing containers by name
             echo "🛑 Removing existing containers to prevent name conflicts..."
-            docker stop mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
-            docker rm mcp-server nginx-proxy react-app deployment-manager 2>/dev/null || true
+            docker stop mcp-server nginx-proxy react-app deployment-manager vibe-kanban vibe-kanban-fixed 2>/dev/null || true
+            docker rm mcp-server nginx-proxy react-app deployment-manager vibe-kanban vibe-kanban-fixed 2>/dev/null || true
             
             # Stop existing containers gracefully
             docker compose down --remove-orphans || true
@@ -450,8 +451,9 @@ jobs:
           # Health checks simulation (GitHub Actions can't access private IPs)
           echo "🔍 Simulating health checks for ${{ env.SSH_HOST }}"
           echo "📊 Would check: http://${{ env.SSH_HOST }}/health"
-          echo "📊 Would check: http://${{ env.SSH_HOST }}/service"  
+          echo "📊 Would check: http://${{ env.SSH_HOST }}/service"
           echo "📊 Would check: http://${{ env.SSH_HOST }}:8080"
+          echo "📊 Would check: http://${{ env.SSH_HOST }}:3001 (Vibe-Kanban)"
           echo "✅ Health check simulation completed"
           
           # Legacy system health simulation
@@ -506,6 +508,7 @@ jobs:
             echo "  - Health Check: http://${{ env.SSH_HOST }}/health"
             echo "  - Service Status: http://${{ env.SSH_HOST }}/service"
             echo "  - MCP API: http://${{ env.SSH_HOST }}:8080"
+            echo "  - Vibe-Kanban: http://${{ env.SSH_HOST }}:3001"
             echo ""
             echo "📊 Monitoring:"
             echo "  - GitHub Actions: ${{ github.server_url }}/${{ github.repository }}/actions"
