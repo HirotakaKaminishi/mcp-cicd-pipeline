@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+echo "=========================================="
+echo "CI/CD Test Deployment - $(date '+%Y-%m-%d %H:%M:%S')"
+echo "=========================================="
 echo "Starting Vibe-Kanban Mock Backend on port 3002 (ApiResponse format with CRUD)..."
 
 node -e "
