@@ -1,8 +1,15 @@
 name: Enhanced Hybrid CI/CD Pipeline
 
+# =============================================================================
+# OPTIMIZATION: Reduced branch triggers to prevent workflow conflicts
+# Problem: Runs on every push to main, conflicts with docker-deploy.yml
+# Solution: Only run on specific branches or manual dispatch
+# Recommended: Use docker-deploy.yml for main branch deployments
+# =============================================================================
+
 on:
   push:
-    branches: [ main, develop, hybrid-integration ]
+    branches: [ develop, hybrid-integration ]  # Removed 'main' to avoid conflicts
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -16,6 +23,11 @@ on:
           - dual
           - mcp-api
           - ssh-docker
+
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   # Deployment Configuration
@@ -234,6 +246,7 @@ jobs:
     name: Deploy via MCP API (Legacy System)
     runs-on: self-hosted
     needs: build-artifacts
+    timeout-minutes: 30  # Job-level timeout protection
     if: needs.build-artifacts.result == 'success' && (github.event.inputs.deploy_strategy == 'dual' || github.event.inputs.deploy_strategy == 'mcp-api' || github.event.inputs.deploy_strategy == '')
     outputs:
       mcp_deployment_status: ${{ steps.mcp_deploy.outputs.status }}
@@ -297,48 +310,61 @@ jobs:
           echo "release_path=${{ env.LEGACY_PATH }}/releases/$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
 
       - name: Deploy Docker Compose Stack (Host-level)
+        timeout-minutes: 15
         run: |
           echo "🐳 Deploying Docker Compose stack on host system..."
-          
+
+          # =================================================================
+          # OPTIMIZATION: Reduced timeout and build optimization
+          # Problem: docker compose build --no-cache takes 20+ minutes
+          # Solution: Use build cache, conditional build, timeout protection
+          # Status: ✅ FIXED - Maximum 15 minutes execution time
+          # =================================================================
+
           # Check if docker-compose.yml exists in project root
           if [ -f "docker-compose.yml" ]; then
             echo "📋 Found docker-compose.yml in project root"
-            
+
             # Stop and remove existing containers by name
             echo "🛑 Removing existing containers to prevent name conflicts..."
             docker stop mcp-server nginx-proxy react-app deployment-manager vibe-kanban vibe-kanban-fixed 2>/dev/null || true
             docker rm mcp-server nginx-proxy react-app deployment-manager vibe-kanban vibe-kanban-fixed 2>/dev/null || true
-            
+
             # Stop existing containers with compose
             docker compose down --remove-orphans || echo "No existing containers to stop"
-            
+
             # Create necessary directories
             mkdir -p logs/nginx logs/mcp deployment
-            
-            # Copy source files for volume mounts
-            rsync -av --exclude='.git' mcp-cicd-pipeline/ ./deployment/mcp-cicd-pipeline/ 2>/dev/null || \
-            cp -r mcp-cicd-pipeline/ ./deployment/ 2>/dev/null || \
-            echo "Source files copied or already in place"
-            
-            # Build and start containers
-            echo "🔨 Building and starting Docker Compose stack..."
-            docker compose build --no-cache
-            docker compose up -d --force-recreate --remove-orphans
-            
+
+            # Copy source files for volume mounts (optimized)
+            echo "📁 Preparing deployment files..."
+            if [ -d "mcp-cicd-pipeline" ]; then
+              rsync -av --exclude='.git' --exclude='node_modules' --exclude='dist' \
+                mcp-cicd-pipeline/ ./deployment/mcp-cicd-pipeline/ 2>/dev/null || \
+              cp -r mcp-cicd-pipeline/ ./deployment/ 2>/dev/null || \
+              echo "Source files copied or already in place"
+            fi
+
+            # Build and start containers (with cache, faster)
+            echo "🔨 Building and starting Docker Compose stack (using build cache)..."
+            docker compose build  # Removed --no-cache for faster builds
+            docker compose up -d --remove-orphans  # Removed --force-recreate for speed
+
             # Wait for services to start
-            sleep 30
-            
+            echo "⏳ Waiting for services to initialize..."
+            sleep 20  # Reduced from 30 to 20 seconds
+
             # Check container status
             echo "📊 Container Status:"
             docker compose ps
-            
+
             # Run health checks
             echo "🏥 Running health checks..."
             curl -f http://localhost:8080/health && echo "✅ MCP Server healthy" || echo "⚠️  MCP Server check failed"
             curl -f http://localhost/ && echo "✅ Nginx healthy" || echo "⚠️  Nginx check failed"
             curl -f http://localhost:3000 && echo "✅ React App healthy" || echo "⚠️  React App check failed"
             curl -f http://localhost:3001 && echo "✅ Vibe-Kanban healthy" || echo "⚠️  Vibe-Kanban check failed"
-            
+
             echo "✅ Docker Compose stack deployment completed"
           else
             echo "⚠️  docker-compose.yml not found, skipping Docker deployment"
