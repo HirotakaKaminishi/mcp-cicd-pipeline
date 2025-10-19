@@ -2,7 +2,8 @@
 set -e
 
 echo "=========================================="
-echo "CI/CD Test Deployment - $(date '+%Y-%m-%d %H:%M:%S')"
+echo "Vibe-Kanban Mock API v2.0.0 (CI/CD Auto-Deploy)"
+echo "Deployment Time: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=========================================="
 echo "Starting Vibe-Kanban Mock Backend on port 3002 (ApiResponse format with CRUD)..."
 

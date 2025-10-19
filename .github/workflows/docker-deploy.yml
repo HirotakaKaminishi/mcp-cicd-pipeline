@@ -161,7 +161,12 @@ jobs:
             # =============================================================
             ssh root@${{ env.MCP_SERVER_HOST }} << 'EOF'
               cd ${{ env.DEPLOY_PATH }}
-              
+
+              # Fix CRLF line endings from Windows (prevents "Illegal option" errors)
+              echo "Removing CRLF from shell scripts..."
+              find vibe-kanban-docker -name "*.sh" -exec sh -c 'cat {} | tr -d "\r" > {}.tmp && mv {}.tmp {} && chmod +x {}' \;
+              echo "CRLF removal completed"
+
               # Stop existing containers if any (graceful shutdown)
               docker compose down || true
               
