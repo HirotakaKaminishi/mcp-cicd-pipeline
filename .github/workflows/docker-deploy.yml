@@ -294,18 +294,29 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, build-and-deploy]
     name: Send Notifications
-    if: always()
+    if: always() && (needs.build-and-deploy.result == 'success' || needs.build-and-deploy.result == 'failure')
     steps:
       - name: Notify deployment status
         run: |
+          echo "=== Deployment Status Report ==="
+          echo "Test Job: ${{ needs.test.result }}"
+          echo "Build and Deploy Job: ${{ needs.build-and-deploy.result }}"
+
           if [ "${{ needs.build-and-deploy.result }}" == "success" ]; then
+            echo ""
             echo "✅ Docker deployment successful"
             echo "🌐 Services available at:"
             echo "  - Main site: http://${{ env.MCP_SERVER_HOST }}"
             echo "  - Health check: http://${{ env.MCP_SERVER_HOST }}/health"
             echo "  - MCP API: http://${{ env.MCP_SERVER_HOST }}:8080"
             echo "  - Vibe-Kanban: http://${{ env.MCP_SERVER_HOST }}:3001"
-          else
+            exit 0
+          elif [ "${{ needs.build-and-deploy.result }}" == "failure" ]; then
+            echo ""
             echo "❌ Docker deployment failed"
             exit 1
+          else
+            echo ""
+            echo "⚠️ Build and deploy job was skipped or cancelled"
+            exit 0
           fi
