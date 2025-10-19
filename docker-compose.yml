@@ -52,8 +52,8 @@ services:
       - "${NGINX_HTTP_PORT:-80}:80"
       - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
-      - ./nginx/conf:/etc/nginx/conf.d
-      - ./nginx/html:/usr/share/nginx/html
+      # NOTE: Configuration files are baked into the Docker image during build
+      # Do NOT mount ./nginx/conf as it will override the built-in config
       - ./logs/nginx:/var/log/nginx
     networks:
       - mcp-network
@@ -91,14 +91,14 @@ services:
       - NGINX_WORKER_CONNECTIONS=${NGINX_WORKER_CONNECTIONS:-1024}
 
   react-app:
-    image: node:20-alpine
+    build:
+      context: ./mcp-cicd-pipeline/docker-enhanced/react-app
+      dockerfile: Dockerfile
     container_name: react-app
     ports:
       - "${REACT_PORT:-3000}:${VITE_PORT:-3000}"
-    volumes:
-      - ./03_sample_projects/react_apps:/app
-    working_dir: /app
-    command: sh -c "npm install && echo 'Starting mock API on port 3001...' && node mock-api.js & sleep 3 && npm run dev -- --host 0.0.0.0 --port 3000"
+    # NOTE: Application code is baked into the Docker image during build
+    # No volume mount needed for production deployment
     networks:
       - mcp-network
     restart: always
