@@ -2,7 +2,8 @@
   "env": {
     "LANGUAGE": "ja",
     "LOCALE": "ja-JP",
-    "UI_LANGUAGE": "japanese"
+    "UI_LANGUAGE": "japanese",
+    "MAX_THINKING_TOKENS": "200000"
   },
   "permissions": {
     "allow": [

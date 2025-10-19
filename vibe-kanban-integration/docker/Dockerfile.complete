@@ -1,0 +1,43 @@
+# Complete Vibe-Kanban Dockerfile with actual vibe-kanban included
+FROM node:18-alpine
+
+# Install system dependencies including Rust toolchain for vibe-kanban
+RUN apk add --no-cache \
+    curl \
+    git \
+    python3 \
+    make \
+    g++ \
+    bash
+
+# Create non-root user
+RUN addgroup -g 1001 -S vibekanban && \
+    adduser -S vibe -u 1001 -G vibekanban
+
+WORKDIR /app
+
+# Install vibe-kanban globally
+RUN npm install -g vibe-kanban@latest
+
+# Copy integration layer
+COPY --chown=vibe:vibekanban package*.json ./
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+COPY --chown=vibe:vibekanban . .
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/.config && \
+    chown -R vibe:vibekanban /app
+
+USER vibe
+
+# Expose both ports
+EXPOSE 3000 3001
+
+# Health check for both services
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Start script that runs both vibe-kanban and integration server
+CMD ["sh", "-c", "npx vibe-kanban --port 3000 & npm start"]

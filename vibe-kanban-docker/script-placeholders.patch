@@ -1,0 +1,13 @@
+--- a/frontend/src/utils/script-placeholders.ts
++++ b/frontend/src/utils/script-placeholders.ts
+@@ -57,7 +57,8 @@ class ScriptPlaceholderContext {
+ }
+
+ export function createScriptPlaceholderStrategy(
+-  osType: string
++  osType?: string
+ ): ScriptPlaceholderStrategy {
+-  if (osType.toLowerCase().includes('windows')) {
++  // Safety check: handle undefined or null osType
++  if (osType && osType.toLowerCase().includes('windows')) {
+     return new WindowsScriptPlaceholderStrategy();

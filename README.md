@@ -21,11 +21,12 @@ GitHub Repository → GitHub Actions → Docker Build → Docker Compose Deploym
     │  │            Docker Network (mcp-network)              │   │
     │  │                172.20.0.0/16                        │   │
     │  └──────────────────────────────────────────────────────┘   │
-    │                                                               │
-    │  ┌──────────────────────────────────────────────────────┐   │
-    │  │         Deployment Manager Container             │   │
-    │  │              (CI/CD Automation)                      │   │
-    │  └──────────────────────────────────────────────────────┘   │
+    │                     │                                        │
+    │  ┌──────────────┐   │   ┌──────────────────────────────┐   │
+    │  │ Vibe-Kanban  │   │   │   Deployment Manager         │   │
+    │  │ AI Orchestr. │   │   │   (CI/CD Automation)         │   │
+    │  │ :3001 🔧     │   │   │                              │   │
+    │  └──────────────┘   │   └──────────────────────────────┘   │
     └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -47,6 +48,11 @@ GitHub Repository → GitHub Actions → Docker Build → Docker Compose Deploym
   - `default.conf` - Proxy and routing rules
 - **`react-app/`** - **React Application Container**
   - `Dockerfile` - Node.js 20 with Vite support
+- **`vibe-kanban-docker/`** - **🎯 Vibe-Kanban AI Orchestration Container**
+  - `Dockerfile` - Node.js 20 Alpine with Chromium support
+  - `setup.sh` / `setup.bat` - Cross-platform setup scripts
+  - `verify.sh` - Integration testing script
+  - `README.md` - Comprehensive implementation documentation
 - **`deployment/`** - **Deployment Manager Container**
   - `Dockerfile` - CI/CD automation container
   - `package.json` - Deployment tool dependencies

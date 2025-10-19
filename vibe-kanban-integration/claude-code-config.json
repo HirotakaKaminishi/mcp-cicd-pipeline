@@ -1,0 +1,138 @@
+{
+  "version": "1.0.0",
+  "name": "vibe-kanban-mcp-integration",
+  "description": "Claude Code integration configuration for Vibe-Kanban",
+  "mcpServers": {
+    "vibe-kanban": {
+      "command": "node",
+      "args": ["./mcp-server-adapter.js"],
+      "env": {
+        "MCP_SERVER_URL": "http://mcp-server:8080",
+        "VIBE_KANBAN_URL": "http://vibe-kanban:3000",
+        "LOG_LEVEL": "info"
+      }
+    }
+  },
+  "tools": {
+    "vibe_kanban_create_task": {
+      "description": "Create a new task in Vibe-Kanban board",
+      "parameters": {
+        "title": {
+          "type": "string",
+          "description": "Task title"
+        },
+        "description": {
+          "type": "string", 
+          "description": "Detailed task description"
+        },
+        "assignedAgent": {
+          "type": "string",
+          "enum": ["claude-code", "gemini-cli", "amp", "auto"],
+          "description": "AI agent to assign the task to"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "default": "medium"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["refactoring", "testing", "documentation", "bug-fixes", "feature-development"],
+          "description": "Task category for proper routing"
+        },
+        "repository": {
+          "type": "string",
+          "description": "Target repository for the task"
+        }
+      },
+      "required": ["title", "description", "category"]
+    },
+    "vibe_kanban_update_task": {
+      "description": "Update existing task status or details",
+      "parameters": {
+        "taskId": {
+          "type": "string",
+          "description": "Unique task identifier"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["todo", "in_progress", "review", "done", "blocked"],
+          "description": "New task status"
+        },
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Task completion percentage"
+        }
+      },
+      "required": ["taskId"]
+    },
+    "vibe_kanban_list_tasks": {
+      "description": "List tasks with optional filtering",
+      "parameters": {
+        "status": {
+          "type": "string",
+          "enum": ["todo", "in_progress", "review", "done", "blocked", "all"],
+          "default": "all"
+        },
+        "assignedAgent": {
+          "type": "string",
+          "description": "Filter by assigned agent"
+        },
+        "category": {
+          "type": "string",
+          "description": "Filter by task category"
+        }
+      }
+    },
+    "vibe_kanban_agent_status": {
+      "description": "Get status of all AI agents",
+      "parameters": {}
+    }
+  },
+  "safeguards": {
+    "enabled": true,
+    "rules": [
+      {
+        "name": "critical_path_protection",
+        "description": "Prevent AI agents from modifying critical system files",
+        "protected_paths": [
+          "/.github/workflows/",
+          "/docker-compose.yml",
+          "/package.json",
+          "/src/core/",
+          "/config/production.json"
+        ]
+      },
+      {
+        "name": "concurrent_limit",
+        "description": "Limit concurrent AI agent operations",
+        "max_concurrent_agents": 3
+      },
+      {
+        "name": "require_review",
+        "description": "Require human review for certain operations",
+        "review_required_for": [
+          "production_deployment",
+          "security_related",
+          "database_migration",
+          "config_changes"
+        ]
+      }
+    ]
+  },
+  "integration": {
+    "github": {
+      "enabled": true,
+      "auto_create_branches": true,
+      "auto_create_pr": false,
+      "require_review": true
+    },
+    "ci_cd": {
+      "enabled": true,
+      "trigger_on_completion": true,
+      "wait_for_tests": true
+    }
+  }
+}
