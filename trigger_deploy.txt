@@ -1,0 +1,4 @@
+Trigger Docker MCP Server CI/CD Pipeline
+Timestamp: 2025-10-19T12:30:00+09:00
+Purpose: Verify Docker network cleanup fix in deploy-mcp-api job
+Expected: Network conflict error should be resolved
