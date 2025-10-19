@@ -334,8 +334,15 @@ jobs:
             echo "🧹 Cleaning up existing deployment..."
             docker compose down --remove-orphans --volumes || echo "No existing containers to stop"
 
-            # Remove conflicting network if exists
-            docker network rm mcp-cicd-pipeline_mcp-network 2>/dev/null || echo "Network already removed or doesn't exist"
+            # Remove ALL potentially conflicting networks
+            echo "🌐 Removing potentially conflicting Docker networks..."
+            docker network rm mcp-cicd-pipeline_mcp-network 2>/dev/null || echo "mcp-cicd-pipeline_mcp-network already removed"
+            docker network rm deployment_mcp-network 2>/dev/null || echo "deployment_mcp-network already removed"
+            docker network rm work_mcp-network 2>/dev/null || echo "work_mcp-network already removed"
+
+            # List remaining networks for debugging
+            echo "📋 Current Docker networks:"
+            docker network ls | grep -E "(mcp-network|NETWORK)" || echo "No mcp-network found"
 
             # Create necessary directories
             mkdir -p logs/nginx logs/mcp deployment
